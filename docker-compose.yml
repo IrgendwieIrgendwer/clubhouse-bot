@@ -1,0 +1,31 @@
+version: '3.9'
+
+services:
+  mariadb:
+    image: mariadb
+    restart: always
+    environment:
+      - "MYSQL_USER=clubhouse"
+      - "MYSQL_PASSWORD=clubhouse"
+      - "MYSQL_DATABASE=clubhouse"
+      - "MYSQL_RANDOM_ROOT_PASSWORD=yes"
+      #- "MYSQL_INITDB_SKIP_TZINFO=yes"
+
+  clubhouse:
+    image: local/clubhouse
+    restart: always
+    tty: true
+    depends_on:
+      - mariadb
+    environment:
+      - 'TOKEN=YOUR_DISCORD_TOKEN'
+      - 'DB_HOST=mariadb'
+      - 'DB_PORT=3306'
+      - 'DB_DATABASE=clubhouse'
+      - 'DB_USER=clubhouse'
+      - 'DB_PASSWORD=clubhouse'
+      - 'SENTRY_DSN=ADD_YOUR_SENTRY_DSN_HERE'
+      - 'OWNER_ID=160462182344032256'
+      - 'MESSAGE_LINK=https://discord.com/channels/801093414653001729/801093414653001732/801139898308100127'
+      - 'TEAM_ROLE_ID=801151257767182346'
+      - 'TEAM_CHANNEL_ID=801127858914328576'

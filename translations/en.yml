@@ -1,0 +1,145 @@
+# profile
+profile_status:
+  - github.com/TheCatAliasTNT2k/clubhouse-bot
+  - Developed by TheCatAliasTNT2k#7587
+
+# ping
+pong: Pong!
+pong_latency: ":hourglass: {:.0f} ms"
+
+# status
+online_status: ":vertical_traffic_light: Online Status"
+status_description: ":label: **Clubhouse Bot v{}**"
+logged_in: ":robot: Logged in"
+heartbeat: ":heartbeat: Heartbeat"
+
+# error
+error: ":x: Error"
+
+# prefix
+prefix: Prefix
+invalid_prefix_length: Length of prefix must be between 1 and 16
+prefix_invalid_chars: Prefix contains invalid characters.
+prefix_updated: "Prefix has been updated. :white_check_mark:"
+log_prefix_updated: "**Bot prefix** has been **changed** to `{}`"
+
+# info
+bot_description: Clubhouse Invite Management Bot für Kanzlei WBS
+features:
+  - Invite Management for Clubhouse
+admin_features:
+  - Permission system
+features_title: Features
+author_title: Author
+contributors_title: Contributors
+github_title: GitHub
+version_title: Version
+prefix_title: Prefix
+help_command_title: Help Command
+bugs_features_title: Bug Reports
+bugs_features: \@Team pingen
+
+# help
+cog_or_command_not_found: This cog or command does not exist.
+description: Description
+subcommands: Subcommands
+no_category: No category
+help: Help
+help_usage: |
+  Type `{0}help <command>` for more info on a command.
+  Type `{0}help <cog>` for more info on a cog.
+
+#general
+no_dm: ":warning: {} does not allow direct messages."
+
+
+#gift
+gift_title: "Clubhouse Invites teilen"
+gift_description: "Hallo {},
+  danke das du deine Clubhouse-Invites mit anderen Suchenden teilen möchtest.\n
+  Ich wähle dazu zufällig einige Suchende aus und werde diese mit dir in Verbindung bringen.
+  Bitte schreibe mir jetzt wie viele Einladungen du vergeben kannst!\n
+
+  Wenn du Fragen oder Anregungen hast, dann kannst du diese uns gerne in <#800747334265864192> schreiben.\n\n
+  **Wichtige Hinweise**\n
+  Sofern ein Suchender gefunden wurde, werdet ihr auf dem Server gemeinsam zu einen Channel hinzugefügt. Dieser teilt dir dann seine Nummer mit. Diese fügst du in dein Kontaktbuch, aktualisierst die App und drückst auf „invite“. Die dann vorgeschlagene SMS musst du nicht versenden. Teile dem Suchenden dann einfach mit, dass er sich nun in der App einloggen kann.\n
+
+  Folgst du eigentlich schon dem Clubhouse-Account von Christian Solmecke? Wenn nicht, dann nutze doch die Wartezeit bis wir einen Suchenden ausfindig gemacht haben und folge ihm unter @solmecke.\n
+
+  PS: Vergiss uns nicht zu schreiben, wie viele Einladungen du zu vergeben hast. :) Bitte gib nur die Zahl ein! z.B. `2` und nicht ~~`3 Stück`~~!"
+gift_reminder: "Du hast uns noch immer nicht die Anzahl deiner Einladungen geschickt. Falls du keine Einladungen mehr hast schreibe mir `exit`!"
+gift_invalid_input: "Bitte sende nur die Anzahl (0 < x < 5) der Einladungen ohne Text! (z.B. `2` und nicht ~~`3 Stück`~~)"
+gift_ready: "Ich werde dich schnellstmöglich mit einem Suchenden im Verbindung bringen."
+
+#mag
+mag_field_name: "Nach Clubhouse Invites fragen"
+mag_field_value: "
+  Hallo {}, ich werde dich schnellstmöglich in einen Channel einladen, in dem du mit dem Einladenden schreiben kannst. Bitte habe etwas Geduld.\n\n
+  Bitte lese und befolge unbedingt untenstehende Hinweise, sonst kann dein Ticket nicht bearbeitet werden!\n\n
+  **Wichtige Hinweise**\n
+  Du hast dich soeben erfolgreich als Suchender gemeldet. Sofern wir einen Einladenden haben, der einen Invite teilen möchte, werden wir ihn mit dir zusammenführen.\n
+
+  Zurzeit ist es nur möglich einen Invite direkt über die App an eine Telefonnummer, welche sich im Kontaktbuch des Einladenden befindet, zu versenden. Daher musst du deine Telefonnummer mit dem Einladenden teilen. Anders kommt man zur Zeit leider nicht an einen Invite.\n
+
+  Du verpflichtest dich außerdem dazu, deine eigenen Einladungen, welche du durch die Registrierung auf Clubhouse erhälst, ebenfalls anderen Suchenden auf diesem Server zur Verfügung zur stellen. Sofern du erfolgreich eingeladen wurdest, eröffne bitte ein Einlader-Ticket in #lies-mich.\n
+  "
+mag_field2_value: "
+  Brauchen deine Freunde auch einen Invite? Dann lade sie bitte nicht direkt ein, sondern zeige ihnen unseren Server (https://wbs.law/clubhouse). Nur, wenn du deine Invites mit anderen Suchenden teilst, funktioniert unser System.\n
+
+  In der Zwischenzeit, während du auf deinen Invite wartest, kannst du außerdem auf unserem Hauptserver vorbeischauen. Dort kannst du dich mit der Community über Rechtsthemen austauschen, Nutzerfragen stellen und vieles mehr. Hier geht’s zum Server: https://wbs.law/discord\n
+
+  Solltest du Fragen oder Anmerkungen haben, so stelle diese in #feedback!
+
+  Damit du eingeladen werden kannst, benötigst du als erstes natürlich die App. Diese findest du im App-Store unter https://apps.apple.com/de/app/clubhouse-drop-in-audio-chat/id1503133294
+  "
+mag_field3_value: "
+  Wenn du sie noch nicht installiert hast, dann hole dies bitte nach. Anschließend schreibe bitte `apple` in den Chat.\n\n
+  **WICHTIG**: Die App ist zur Zeit NUR für IOS verfügbar!\n
+
+  Bevor wir dich mit einem Einladenden zusammenführen, möchten wir noch einmal sicherstellen, dass du danach auch deine eigenen Einladungen mit unserer Community teilst.\n
+
+  Sobald du in der App bist, kehrst du bitte auf diesen Server zurück und klickst im Kanal #lies-mich auf das Geschenk. Es erstellt sich dann ein weiteres Ticket, in welchem du Instruktionen erhälst, wie du mit anderen Suchenden zusammengeführt wirst.\n
+
+  **WICHTIG**: Bitte halte dich unbedingt an diesen Prozess. Du profitierst mit deiner Einladung ebenfalls davon, lass' die anderen nicht hängen!\n
+  Aktuell hast du 2 Einladungen. Diese werden verschickt, sobald man auf 'Invite' tippt. Pass' daher bitte auf, dass du dich nicht vertippst."
+mag_added_queue: "Du wurdest zur Warteschlange hinzugefügt!"
+close_channel_reminder: "<@{}> <@{}> Seid ihr fertig? Wenn ja channel schließen! (`.close`)"
+paired_users: "{} und {} chatten miteinander!"
+ping_users: "{} {} hier könnt ihr euch austauschen!"
+tutorial_embed_title: "It's a Match!"
+tutorial_embed_description: "
+  Hey {0}, {1} lädt dich ein Clubhouse zu nutzen.\n\n
+  **Anleitung**:\n
+  - {0} schickt seine Telefonnummer an {1} (hier oder per DM).\n
+  - Nachdem {0} seine Einladung erhalten hat, erstellt er seinen Account.\n
+  - Wenn alles funktioniert hat, gibt einer von euch `.close` ein, um den Channel zu löschen.\n
+  \n
+  Falls ihr Unterstützung benötigt: @Team
+  "
+chanenl_delete_denied: "{} Du darfst diesen Channel nicht löschen!"
+wrong_channel: "{} Du kannst diesen Channel nicht löschen, da er nicht dir gehört!"
+user_not_found: "{} hat in der Datenbank keine Einträge!"
+user_resetted: "{} wurde aus der Datenbank gelöscht!"
+permission_denied: "{} du hast keine Erlaubnis dafür!"
+queue_left: "Du hast die Warteschlange verlassen."
+queue_stopped: "Du hast die Suche abgebrochen."
+queue_left_already_assigned: "Du wurdest bereits einem Channel zugeteilt!"
+stop_donating: "Du bietest keine Einladungen mehr an."
+all_invited_donated: "Du solltest bereits alle Invites verbraucht haben, wenn nicht pinge @Team"
+already_in_queue: "Du bist bereits in der Warteschlange!"
+already_invited: "Du solltest bereits einen Invite haben, wenn nicht pinge @Team"
+other_used_quitted: "Der andere User hat leider die Vermittlung abgebrochen, du wirst wieder zur Warteschlange hinzugefügt."
+channel_timed_out: "Während der Vermittlung fand zu lange keine Konversation statt, du wirst zurück in die Warteschlange geführt."
+member_not_found: "Kein User angegeben, oder User nicht gefunden!"
+chanel_was_closed_by_team: "Die Vermittlung wurde vom Team abgebrochen."
+invite_user: "Sobald du deine Einladungen erhalten hast, kehrst du bitte auf diesen Server zurück und klickst im Kanal <#800729533015130143> auf das Geschenk.\nEs erstellt sich dann ein weiteres Ticket, in welchem du Instruktionen erhälst, wie du mit anderen Suchenden zusammengeführt wirst."
+channel_created: "Du wurdest mit {} in den Channel {} gesteckt!"
+read_again: "Du solltest den Text noch einmal durchlesen!"
+self_queue_status: "Du hast noch {} Einladungen zu vergeben!"
+self_still_in_queue: "Du bist noch immer in der Warteschlange, du kannst diese mit `exit` verlassen. Wenn du in einem Vermittlungschannel mit einem anderen User bist, führt das zu einem Ausschluss von dem Prozess!"
+self_still_donating: "Du donatest noch! Wenn du mehr invites hast @Team - die können dich zurücksetzen!"
+self_not_in_queue: "Weder suchst, noch bietest du derzeit Einladunge an!"
+already_in_room: "Du befindest dich bereits in einem Vermittlungsraum!"
+invite_mode: "Du befindest dich derzeit im Einladen-Modus, diesen kannst du mit exit verlassen. Wenn du in einem Vermittlungschannel mit einem anderen User bist, führt das zu einem Ausschluss von dem Prozess!"
+rm_channel: "Der Channel wurde vom Team geschlossen!"
+back_to_queue: "Du wurdest vom Team wieder in die Warteschlange eingereiht!"

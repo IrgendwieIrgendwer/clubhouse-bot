@@ -1,0 +1,27 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[packages]
+sqlalchemy = "*"
+pymysql = "*"
+requests = "*"
+sentry-sdk = "*"
+pyyaml = "*"
+aiohttp = "*"
+alembic = "*"
+discord = {py = "*"}
+pydrocsid = "*"
+
+[dev-packages]
+flake8 = "*"
+
+[requires]
+python_version = "3.9"
+
+[scripts]
+bot = "python clubhouse/clubhouse.py"
+flake8 = "flake8 . --count --max-line-length=120 --statistics --show-source"
+upgrade = "alembic upgrade"
+current = "alembic current"
