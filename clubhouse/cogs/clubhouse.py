@@ -122,7 +122,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         except RuntimeError:
             self.inactive_channel_reminder_loop.restart()
 
-    @tasks.loop(hours=2)
+    @tasks.loop(minutes=30)
     async def inactive_channel_reminder_loop(self):
         # if last message (ignore bot and team messages) was longer than 2 hours ago
         # send message in channel translations.close_channel_reminder
@@ -153,7 +153,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     except Exception as e:
                         sentry_sdk.capture_exception(e)
 
-    @tasks.loop(hours=24)
+    @tasks.loop(minutes=30)
     async def inactive_channel_deleter_loop(self):
         # if last message (ignore bot messages) was longer than 8 hours ago
         change = False
@@ -423,9 +423,9 @@ class Clubhouse(Cog, name="Clubhouse"):
                     if member.id == donator.user_id:
                         await db_thread(Donator.change_state, member.id, State.ABORTED)
                     else:
-                        await db_thread(Donator.change_used_invites, donator.user_id,
-                                        max(0, donator.used_invites - 1))
                         other_id = donator.user_id
+                    await db_thread(Donator.change_used_invites, donator.user_id,
+                                    max(0, donator.used_invites - 1))
                 searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
                 if searcher:
                     if member.id == searcher.user_id:
@@ -560,9 +560,9 @@ class Clubhouse(Cog, name="Clubhouse"):
                     if message.author.id == donator.user_id:
                         await db_thread(Donator.change_state, message.author.id, State.ABORTED)
                     else:
-                        await db_thread(Donator.change_used_invites, donator.user_id,
-                                        max(0, donator.used_invites - 1))
                         other_id = donator.user_id
+                    await db_thread(Donator.change_used_invites, donator.user_id,
+                                    max(0, donator.used_invites - 1))
                 searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
                 if searcher:
                     if message.author.id == searcher.user_id:
@@ -930,6 +930,63 @@ class Clubhouse(Cog, name="Clubhouse"):
 
         if not donator and not searcher:
             await self.send_dm_text(ctx.author, translations.self_not_in_queue)
+            return
+
+    @commands.command(aliases=["ui"])
+    @guild_only()
+    async def user_info(self, ctx: Context, member: Optional[Member]):
+        """
+        show db status of user
+        """
+
+        if ctx.message.author.bot:
+            return
+
+        if not member:
+            await ctx.send(translations.member_not_found)
+            return
+
+        if self.team_role not in ctx.author.roles:
+            await ctx.send(translations.f_permission_denied(ctx.author.mention))
+            return
+
+        searcher: Optional[Searcher] = await db_thread(
+            lambda: db.query(Searcher)
+                .filter_by(user_id=member.id)
+                .first()
+        )
+        if searcher:
+            embed: discord.Embed = discord.Embed(
+                title=f"Searcher Status",
+                description=f"User: <@{searcher.user_id}>\nState: {searcher.state}"
+            )
+            await ctx.send(embed=embed)
+
+        donator: Optional[Donator] = await db_thread(
+            lambda: db.query(Donator)
+                .filter_by(user_id=member.id)
+                .first()
+        )
+        if donator:
+            used_count = donator.invite_count - donator.used_invites
+            used = f' (noch {used_count} von {donator.invite_count} Einladungen verfügbar.)'
+            description = f"User: <@{donator.user_id}>\nState: {donator.state}"
+            description += {
+                State.INITIAL: "",
+                State.QUEUED: used,
+                State.MATCHED: used,
+                State.DONE: f" ({donator.invite_count} Einladungen)",
+                State.ABORTED: used,
+            }[donator.state]
+
+            embed: discord.Embed = discord.Embed(
+                title=f"Donator Status",
+                description=description
+            )
+            await ctx.send(embed=embed)
+
+        if not donator and not searcher:
+            await ctx.send(translations.f_user_not_found(member.mention))
             return
 
     @commands.command()
