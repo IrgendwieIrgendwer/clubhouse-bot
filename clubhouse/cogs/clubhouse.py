@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from functools import cmp_to_key
 from os import getenv
 from re import match
-from typing import Optional, Union, List, Dict, Set
+from typing import Optional, Union, List, Dict, Tuple
 
 import discord
 import sentry_sdk
@@ -26,6 +26,7 @@ from models.channel import Channel
 from models.donator import Donator
 from models.searcher import Searcher
 from models.state import State
+from util import get_prefix
 
 start_message_link = getenv("MESSAGE_LINK")
 team_role_id = getenv("TEAM_ROLE_ID")
@@ -140,7 +141,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     continue
                 async for f in channel.history(oldest_first=False, after=datetime.utcnow() - timedelta(hours=2),
                                                limit=100):
-                    if f.author.bot == self.bot:
+                    if f.author.id == self.bot.user.id:
                         break
                     if not f.author.bot:
                         break
@@ -309,50 +310,46 @@ class Clubhouse(Cog, name="Clubhouse"):
                 return True
             await asyncio.sleep(5)
 
+    async def calculate_queues(self) -> Tuple[List[Searcher], List[Donator]]:
+        def sort_users(x: Union[Donator, Searcher, None] = None, y: Union[Donator, Searcher, None] = None) -> int:
+            if y is None:
+                return -1
+            user_x: Optional[discord.Member] = self.guild.get_member(x.user_id)
+            user_y: Optional[discord.Member] = self.guild.get_member(y.user_id)
+            if user_x.status == Status.offline and user_y.status == Status.offline \
+                    or user_x.status != Status.offline and user_y.status != Status.offline:
+                if isinstance(x, Donator) and isinstance(y, Donator):
+                    return int(x.last_contact.timestamp() - y.last_contact.timestamp())
+                elif isinstance(x, Searcher) and isinstance(y, Searcher):
+                    return int(x.enqueued_at.timestamp() - y.enqueued_at.timestamp())
+            elif user_x.status == Status.offline and user_y.status != Status.offline:
+                return 1
+            elif user_x.status != Status.offline and user_y.status == Status.offline:
+                return -1
+
+        donating_users: List[Donator] = await db_thread(
+            lambda: db.query(Donator)
+                .filter(Donator.used_invites < Donator.invite_count)
+                .filter(Donator.state.in_((State.MATCHED, State.QUEUED)))
+                .all())
+
+        searching_users: List[Searcher] = await db_thread(
+            lambda: db.query(Searcher).filter_by(state=State.QUEUED).all())
+
+        if donating_users:
+            donating_users.sort(key=cmp_to_key(sort_users))
+        if searching_users:
+            searching_users.sort(key=cmp_to_key(sort_users))
+
+        return searching_users, donating_users
+
     async def pair(self):
         async with channel_lock:
-            donating_users: List[Donator] = await db_thread(
-                lambda: db.query(Donator)
-                    .filter(Donator.used_invites < Donator.invite_count)
-                    .filter(Donator.state.in_((State.MATCHED, State.QUEUED)))
-                    .all())
+            searching_users, donating_users = await self.calculate_queues()
             if not donating_users:
                 return
-
-            searching_users: List[Searcher] = await db_thread(
-                lambda: db.query(Searcher).filter_by(state=State.QUEUED).all())
             if not searching_users:
                 return
-
-
-
-            #donating_users.sort(key=cmp_to_key(sort_users))
-            #searching_users.sort(key=cmp_to_key(sort_users))
-
-
-            # große liste ->
-            # 1. online && acc >= 2 tage
-            # 2. online && acc < 2 tage
-            # 3. offline && acc >= 2 tage
-            # 4. offline && acc < 2 tage
-
-
-
-            def sort_users(x=None, y=None) -> int:
-                if y is None:
-                    return -1
-                user_x: Optional[discord.Member] = self.guild.get_member(x.user_id)
-                user_y: Optional[discord.Member] = self.guild.get_member(y.user_id)
-                if user_x.status == Status.offline and user_y.status == Status.offline \
-                        or user_x.status != Status.offline and user_y.status != Status.offline:
-                    return user_x.id < user_y.id
-                elif user_x.status == Status.offline and user_y.status != Status.offline:
-                    return 1
-                elif user_x.status != Status.offline and user_y.status == Status.offline:
-                    return -1
-
-            donating_users.sort(key=cmp_to_key(sort_users))
-            searching_users.sort(key=cmp_to_key(sort_users))
 
             for db_user in searching_users:
                 user: Optional[discord.Member] = self.guild.get_member(db_user.user_id)
@@ -545,6 +542,8 @@ class Clubhouse(Cog, name="Clubhouse"):
             await self.search_reaction(member)
 
     async def on_message(self, message: Message):
+        if message.content.startswith(await get_prefix()):
+            return
         if message.author.bot:
             return
         user: Union[Donator, Searcher] = await db_thread(db.get, Donator, message.author.id)
@@ -600,7 +599,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await self.pair()
             return
 
-        if isinstance(message.channel, discord.channel.DMChannel):
+        if message.guild is None:
             if isinstance(user, Donator) and user.state == State.INITIAL:
                 matcher = match(r"(\d).*", message.content)
                 if len(matcher.groups()) == 0 or not 1 <= int(matcher.groups()[0]) <= 5:
@@ -617,6 +616,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 if user.state == State.INITIAL:
                     if message.content.lower() == "apple":
                         await db_thread(Searcher.change_state, user.user_id, State.QUEUED)
+                        await db_thread(Searcher.set_timestamp, user.user_id)
                         await self.send_dm_text(message.author, translations.mag_added_queue)
                         await self.pair()
                     else:
@@ -649,7 +649,9 @@ class Clubhouse(Cog, name="Clubhouse"):
         if await db_thread(db.get, Searcher, db_channel.searcher_id):
             await db_thread(Searcher.change_state, db_channel.searcher_id, State.DONE)
         donator: Optional[Donator] = await db_thread(db.get, Donator, db_channel.donator_id)
-        if donator and donator.used_invites >= donator.invite_count:
+        if donator \
+                and donator.used_invites >= donator.invite_count \
+                and await db_thread(lambda: db.query(Channel).filter_by(donator_id=donator.user_id).count()) <= 1:
             await db_thread(Donator.change_state, db_channel.donator_id, State.DONE)
         if db_channel:
             users_to_notify: List[discord.Member] = [
@@ -713,7 +715,6 @@ class Clubhouse(Cog, name="Clubhouse"):
 
                 channel: Optional[TextChannel] = self.bot.get_channel(db_channel.channel_id)
                 await db_thread(db.delete, db_channel)
-                await self.send_dm_text(member, translations.resetted_by_team)
                 await ctx.send(translations.f_user_resetted(member.mention))
                 try:
                     if channel:
@@ -724,7 +725,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await self.pair()
 
         # - increase count if param
-
+        await self.send_dm_text(member, translations.resetted_by_team)
 
     @commands.command(aliases=["s"])
     @guild_only()
@@ -744,10 +745,14 @@ class Clubhouse(Cog, name="Clubhouse"):
 
         channel_count: int = await db_thread(db.count, Channel)
 
+        completed_searchers: int = await db_thread(
+            lambda: db.query(Searcher).filter_by(state=State.DONE).count())
+
         embed: discord.Embed = discord.Embed(title="Statistiken")
         embed.add_field(name="Suchende User", value=str(searching_users), inline=False)
         embed.add_field(name="Angebotene Einladungen", value=active_donations, inline=False)
-        embed.add_field(name="Aktuelle Anzahl der Vermittlungschannels", value=str(channel_count), inline=False)
+        embed.add_field(name="Anzahl der Vermittlungschannels", value=str(channel_count), inline=False)
+        embed.add_field(name="Verschenkte Einladungen", value=str(completed_searchers), inline=False)
         await ctx.send(embed=embed)
 
     @commands.command(aliases=["q"])
@@ -792,7 +797,7 @@ class Clubhouse(Cog, name="Clubhouse"):
 
     @commands.command(aliases=["us"])
     @guild_only()
-    async def unshared_users(self, ctx: Context, ignore_coupled: Optional[bool]=False):
+    async def unshared_users(self, ctx: Context, ignore_coupled: Optional[bool] = False):
         """
         team only
         get users, which have not shared their invites
@@ -829,7 +834,7 @@ class Clubhouse(Cog, name="Clubhouse"):
 
         out = ""
         for _id in not_coupled:
-            out += f"<@{_id}>\n"
+            out += f"<@{_id}> "
             if len(out) > 1000:
                 await ctx.send(out)
                 out = ""
@@ -906,12 +911,10 @@ class Clubhouse(Cog, name="Clubhouse"):
         await self.pair()
 
     @commands.command(aliases=["self"])
-    @guild_only()
     async def self_info(self, ctx: Context):
         """
         show own queue status
         """
-
         if ctx.message.author.bot:
             return
 
@@ -925,7 +928,14 @@ class Clubhouse(Cog, name="Clubhouse"):
             if donator.state == State.INITIAL:
                 await self.send_dm_text(ctx.author, translations.gift_reminder)
             if donator.state == State.QUEUED:
-                await self.send_dm_text(ctx.author, translations.f_self_queue_status(str(donator.invite_count - donator.used_invites)))
+                _, donating_users = await self.calculate_queues()
+                index = 0
+                for donator2 in donating_users:
+                    index += 1
+                    if donator2.user_id == donator.user_id:
+                        break
+                await self.send_dm_text(ctx.author, translations.f_self_queue_status(
+                    str(donator.invite_count - donator.used_invites), index))
             if donator.state == State.MATCHED:
                 await self.send_dm_text(ctx.author, translations.already_in_room)
             return
@@ -940,7 +950,13 @@ class Clubhouse(Cog, name="Clubhouse"):
             if searcher.state == State.INITIAL:
                 await self.send_dm_text(ctx.author, translations.read_again)
             if searcher.state == State.QUEUED:
-                await self.send_dm_text(ctx.author, translations.self_still_in_queue)
+                searching_users, _ = await self.calculate_queues()
+                index = 0
+                for searcher2 in searching_users:
+                    index += 1
+                    if searcher2.user_id == searcher.user_id:
+                        break
+                await self.send_dm_text(ctx.author, translations.f_self_still_in_queue(index))
             if searcher.state == State.MATCHED:
                 await self.send_dm_text(ctx.author, translations.already_in_room)
             return

@@ -114,6 +114,8 @@ async def status_loop():
 
 @bot.command()
 async def ping(ctx: Context):
+    if ctx.author.bot:
+        return
     """
     display bot latency
     """
@@ -173,6 +175,8 @@ async def build_info_embed(authorized: bool) -> Embed:
 
 @bot.command(name="help")
 async def help_cmd(ctx: Context, *, cog_or_command: Optional[str]):
+    if ctx.author.bot:
+        return
     """
     Shows this Message
     """
@@ -184,6 +188,8 @@ async def help_cmd(ctx: Context, *, cog_or_command: Optional[str]):
 
 @bot.command(name="github", aliases=["gh"])
 async def github(ctx: Context):
+    if ctx.author.bot:
+        return
     """
     return the github link
     """
@@ -201,6 +207,8 @@ async def github(ctx: Context):
 
 @bot.command(name="version")
 async def version(ctx: Context):
+    if ctx.author.bot:
+        return
     """
     show version
     """
@@ -211,6 +219,8 @@ async def version(ctx: Context):
 
 @bot.command(name="info", aliases=["infos", "about"])
 async def info(ctx: Context):
+    if ctx.author.bot:
+        return
     """
     show information about the bot
     """
@@ -228,16 +238,21 @@ async def on_error(*_, **__):
 
 @bot.event
 async def on_command_error(ctx: Context, error: CommandError):
-    if isinstance(error, CommandNotFound) and ctx.guild is not None:
-        await ctx.send(f"Use {await get_prefix()}help to get help!")
-    else:
-        sentry_sdk.capture_exception(error)
-        await ctx.send("Critical error, check sentry")
+    if ctx.author.bot:
+        return
+    if ctx.guild is not None and ctx.prefix == await get_prefix():
+        if isinstance(error, CommandNotFound) and ctx.guild is not None and ctx.prefix == await get_prefix():
+            await ctx.send(f"Use {await get_prefix()}help to get help!")
+        else:
+            sentry_sdk.capture_exception(error)
+            await ctx.send("Critical error, check sentry")
     return
 
 
 @listener
 async def on_bot_ping(message: Message):
+    if message.author.bot:
+        return
     await message.channel.send(embed=await build_info_embed(False))
 
 
