@@ -911,7 +911,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             lambda: db.query(Searcher)
                 .filter_by(user_id=ctx.author.id)
                 .filter(Searcher.state.in_((State.INITIAL, State.QUEUED, State.MATCHED)))
-                .all()
+                .first()
         )
         if searcher:
             await self.send_dm_text(ctx.author, translations.self_still_in_queue)
