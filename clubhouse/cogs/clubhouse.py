@@ -791,9 +791,22 @@ class Clubhouse(Cog, name="Clubhouse"):
         #   1. alle searcher, die einen channel haben
         #   2. alle searcher, die keinen channel haben
 
-        s: Set[int] = set(await db_thread(lambda x: set(map(lambda y: y.user_id, x)), db.query(Searcher).filter_by(state=State.DONE).all()))
+        # s: Set[int] = set(await db_thread(lambda x: x.user_id, db.query(Searcher).filter_by(state=State.DONE).all()))
+        s: set[int] = set(
+            map(lambda x: x.user_id, await db_thread(lambda: db.query(Searcher).filter_by(state=State.DONE).all())))
+        # set(map(lambda y: y.user_id, x))
+        # s: Set[Searcher] = set(await db_thread(lambda: db.query(Searcher).filter_by(state=State.DONE).all()))
 
-        s.difference_update(await db_thread(lambda x: set(map(lambda y: y.user_id, x)),  db.query(Donator).filter_by(state=State.DONE).all()))
+        t: set[int] = set(
+            map(lambda x: x.user_id, await db_thread(lambda: db.query(Donator).filter_by(state=State.DONE).all())))
+
+        missing = s - t
+
+        c: set[int] = set(
+            map(lambda x: x.donator_id, await db_thread(lambda: db.query(Channel).all())))
+
+        coupled = missing & c
+        not_coupled = missing - c
 
         out = ""
         for _id in not_coupled:
