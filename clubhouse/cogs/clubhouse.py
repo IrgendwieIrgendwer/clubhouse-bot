@@ -504,8 +504,10 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await self.send_dm_text(member, translations.self_still_in_queue)
             elif user.state == State.MATCHED:
                 await self.send_dm_text(member, translations.already_in_room)
-            elif State.completed(user):
-                await self.send_dm_text(member, translations.already_invited)
+            return
+
+        if user and State.completed(user):
+            await self.send_dm_text(member, translations.already_invited)
             return
 
         embed: discord.Embed = discord.Embed(title=translations.mag_field_name, color=0x1bcc79)
