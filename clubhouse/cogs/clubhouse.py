@@ -1,8 +1,8 @@
 import asyncio
 from asyncio import Lock
 from datetime import datetime, timedelta
+from functools import cmp_to_key
 from os import getenv
-from random import shuffle
 from re import match
 from typing import Optional, Union, List, Dict, Set
 
@@ -14,7 +14,7 @@ from PyDrocsid.events import StopEventHandling
 from PyDrocsid.translations import translations
 from PyDrocsid.util import send_long_embed
 from discord import Message, Role, PartialEmoji, TextChannel, Member, NotFound, Embed, HTTPException, Forbidden, Guild, \
-    CategoryChannel, PermissionOverwrite, ChannelType
+    CategoryChannel, PermissionOverwrite, ChannelType, Status
 from discord.ext import commands, tasks
 from discord.ext.commands import Cog, Bot, guild_only, Context
 from discord.utils import snowflake_time
@@ -190,7 +190,7 @@ class Clubhouse(Cog, name="Clubhouse"):
 
                             db_entry: Optional[Donator] = await db_thread(db.get, Donator, user.id)
                             if db_entry:
-                                await db_thread(Donator.change_state, user.id, State.QUEUED)
+                                await db_thread(Donator.change_state, user.id, State.MATCHED)
                                 await db_thread(Donator.change_used_invites, user.id,
                                                 max(0, db_entry.used_invites - 1))
                             await self.send_dm_text(user, translations.channel_timed_out)
@@ -322,8 +322,21 @@ class Clubhouse(Cog, name="Clubhouse"):
             if not searching_users:
                 return
 
-            shuffle(donating_users)
-            shuffle(searching_users)
+            def sort_users(x=None, y=None) -> int:
+                if y is None:
+                    return -1
+                user_x: Optional[discord.Member] = self.guild.get_member(x.user_id)
+                user_y: Optional[discord.Member] = self.guild.get_member(y.user_id)
+                if user_x.status == Status.offline and user_y.status == Status.offline \
+                        or user_x.status != Status.offline and user_y.status != Status.offline:
+                    return user_x.id < user_y.id
+                elif user_x.status == Status.offline and user_y.status != Status.offline:
+                    return 1
+                elif user_x.status != Status.offline and user_y.status == Status.offline:
+                    return -1
+
+            donating_users.sort(key=cmp_to_key(sort_users))
+            searching_users.sort(key=cmp_to_key(sort_users))
 
             for db_user in searching_users:
                 user: Optional[discord.Member] = self.guild.get_member(db_user.user_id)
@@ -399,9 +412,10 @@ class Clubhouse(Cog, name="Clubhouse"):
             if State.completed(user):
                 continue
 
+            db_channel = None
             for db_channel in await db_thread(lambda: db.query(Channel).filter(or_(
-                member.id == Channel.donator_id,
-                member.id == Channel.searcher_id
+                    member.id == Channel.donator_id,
+                    member.id == Channel.searcher_id
             )).all()):
                 donator = await db_thread(db.get, Donator, db_channel.donator_id)
                 other_id = 0
@@ -429,6 +443,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                         await channel.delete()
                 except Exception as e:
                     sentry_sdk.capture_exception(e)
+            if db_channel:
+                await self.pair()
 
     async def on_raw_reaction_add(self, message: Message, emoji: PartialEmoji, member: Member):
         if member.bot or message.guild is None:
@@ -531,6 +547,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             if user.state != State.MATCHED:
                 return
 
+            db_channel = None
             for db_channel in await db_thread(lambda: db.query(Channel).filter(or_(
                     message.author.id == Channel.donator_id,
                     message.author.id == Channel.searcher_id
@@ -561,6 +578,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                         await channel.delete()
                 except Exception as e:
                     sentry_sdk.capture_exception(e)
+            if db_channel:
+                await self.pair()
             return
 
         if isinstance(message.channel, discord.channel.DMChannel):
@@ -657,6 +676,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             await ctx.send(translations.f_user_not_found(member.mention))
             return
         else:
+            db_channel = None
             for db_channel in await db_thread(lambda: db.query(Channel).filter(or_(
                     member.id == Channel.donator_id,
                     member.id == Channel.searcher_id
@@ -680,6 +700,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                         await channel.delete()
                 except Exception as e:
                     sentry_sdk.capture_exception(e)
+            if db_channel:
+                await self.pair()
 
         # - increase count if param
 
@@ -734,7 +756,6 @@ class Clubhouse(Cog, name="Clubhouse"):
         embed.add_field(name="Anbietende User", value=active_donator_list or "Keine Angebote", inline=True)
         await send_long_embed(ctx, embed)
 
-
     @commands.command()
     @guild_only()
     async def count_queue(self, ctx: Context):
@@ -752,10 +773,11 @@ class Clubhouse(Cog, name="Clubhouse"):
 
     @commands.command(aliases=["us"])
     @guild_only()
-    async def unshared_users(self, ctx: Context):
+    async def unshared_users(self, ctx: Context, ignore_coupled: Optional[bool]=False):
         """
         team only
         get users, which have not shared their invites
+        ignore_coupled: if all coupled should be mentioned as well
         """
         if ctx.message.author.bot:
             return
@@ -763,20 +785,41 @@ class Clubhouse(Cog, name="Clubhouse"):
             await ctx.send(translations.f_permission_denied(ctx.author.mention))
             return
 
+        # 1. alle searcher holen, die DONE sind
+        # 2. alle searcher rauswerfen, die einen donator auf DONE haben (beide haben user_id)
+        # 3. teilen:
+        #   1. alle searcher, die einen channel haben
+        #   2. alle searcher, die keinen channel haben
+
         s: Set[int] = set(await db_thread(lambda x: set(map(lambda y: y.user_id, x)), db.query(Searcher).filter_by(state=State.DONE).all()))
 
         s.difference_update(await db_thread(lambda x: set(map(lambda y: y.user_id, x)),  db.query(Donator).filter_by(state=State.DONE).all()))
 
         out = ""
-        for _id in s:
-            out += f'<@{_id}>\n'
+        for _id in not_coupled:
+            out += f"<@{_id}>\n"
             if len(out) > 1000:
                 await ctx.send(out)
                 out = ""
         if out != "":
             await ctx.send(out)
-        if len(s) == 0:
+
+        if not ignore_coupled:
+            out = ""
+            for _id in coupled:
+                out += f"*<@{_id}>\n"
+                if len(out) > 1000:
+                    await ctx.send(out)
+                    out = ""
+            if out:
+                await ctx.send(out)
+
+            if not coupled and not not_coupled:
+                await ctx.send("Keine gefunden!")
+
+        elif not not_coupled:
             await ctx.send("Keine gefunden!")
+
 
     @commands.command()
     @guild_only()
@@ -904,6 +947,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             await ctx.send(translations.rm_channel)
             return
 
+        db_channel = None
         for db_channel in await db_thread(lambda: db.query(Channel)
                 .filter(or_(member.id == Channel.donator_id, member.id == Channel.searcher_id)).all()):
 
@@ -935,6 +979,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                     await channel.delete()
             except Exception as e:
                 sentry_sdk.capture_exception(e)
+        if db_channel:
+            await self.pair()
         await self.send_dm_text(member, translations.chanel_was_closed_by_team)
 
     if getenv("DEBUG") == "true" or getenv("DEBUG") == 1:
