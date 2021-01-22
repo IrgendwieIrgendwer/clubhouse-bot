@@ -903,8 +903,12 @@ class Clubhouse(Cog, name="Clubhouse"):
                 .first()
         )
         if donator:
-            await self.send_dm_text(ctx.author,
-                                    translations.f_self_queue_status(str(donator.invite_count - donator.used_invites)))
+            if donator.state == State.INITIAL:
+                await self.send_dm_text(ctx.author, translations.gift_reminder)
+            if donator.state == State.QUEUED:
+                await self.send_dm_text(ctx.author, translations.f_self_queue_status(str(donator.invite_count - donator.used_invites)))
+            if donator.state == State.MATCHED:
+                await self.send_dm_text(ctx.author, translations.already_in_room)
             return
 
         searcher: Optional[Searcher] = await db_thread(
@@ -914,7 +918,12 @@ class Clubhouse(Cog, name="Clubhouse"):
                 .first()
         )
         if searcher:
-            await self.send_dm_text(ctx.author, translations.self_still_in_queue)
+            if searcher.state == State.INITIAL:
+                await self.send_dm_text(ctx.author, translations.read_again)
+            if searcher.state == State.QUEUED:
+                await self.send_dm_text(ctx.author, translations.self_still_in_queue)
+            if searcher.state == State.MATCHED:
+                await self.send_dm_text(ctx.author, translations.already_in_room)
             return
 
         if not donator and not searcher:
