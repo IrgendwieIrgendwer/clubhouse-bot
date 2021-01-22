@@ -122,7 +122,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         except RuntimeError:
             self.inactive_channel_reminder_loop.restart()
 
-    @tasks.loop(minutes=30)
+    @tasks.loop(hours=2)
     async def inactive_channel_reminder_loop(self):
         # if last message (ignore bot and team messages) was longer than 2 hours ago
         # send message in channel translations.close_channel_reminder
@@ -140,6 +140,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                     continue
                 async for f in channel.history(oldest_first=False, after=datetime.utcnow() - timedelta(hours=2),
                                                limit=100):
+                    if f.author.bot == self.bot:
+                        break
                     if not f.author.bot:
                         break
                 else:
@@ -278,7 +280,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             else:
                 await self.remove_from_queue(data)
                 return True
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
     async def send_dm_embed(self, user: Union[discord.User, discord.Member], embed: Embed) -> bool:
         data = (user.id, embed.description)
@@ -305,7 +307,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             else:
                 await self.remove_from_queue(data)
                 return True
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
     async def pair(self):
         async with channel_lock:
@@ -321,6 +323,20 @@ class Clubhouse(Cog, name="Clubhouse"):
                 lambda: db.query(Searcher).filter_by(state=State.QUEUED).all())
             if not searching_users:
                 return
+
+
+
+            #donating_users.sort(key=cmp_to_key(sort_users))
+            #searching_users.sort(key=cmp_to_key(sort_users))
+
+
+            # große liste ->
+            # 1. online && acc >= 2 tage
+            # 2. online && acc < 2 tage
+            # 3. offline && acc >= 2 tage
+            # 4. offline && acc < 2 tage
+
+
 
             def sort_users(x=None, y=None) -> int:
                 if y is None:
@@ -697,6 +713,8 @@ class Clubhouse(Cog, name="Clubhouse"):
 
                 channel: Optional[TextChannel] = self.bot.get_channel(db_channel.channel_id)
                 await db_thread(db.delete, db_channel)
+                await self.send_dm_text(member, translations.resetted_by_team)
+                await ctx.send(translations.f_user_resetted(member.mention))
                 try:
                     if channel:
                         await channel.delete()
@@ -707,7 +725,6 @@ class Clubhouse(Cog, name="Clubhouse"):
 
         # - increase count if param
 
-        await ctx.send(translations.f_user_resetted(member.mention))
 
     @commands.command(aliases=["s"])
     @guild_only()

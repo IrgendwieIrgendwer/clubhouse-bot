@@ -98,7 +98,7 @@ mag_field3_value: "
 
   Bevor wir dich mit einem Einladenden zusammenführen, möchten wir noch einmal sicherstellen, dass du danach auch deine eigenen Einladungen mit unserer Community teilst.\n
 
-  Sobald du in der App bist, kehrst du bitte auf diesen Server zurück und klickst im Kanal #lies-mich auf das Geschenk. Es erstellt sich dann ein weiteres Ticket, in welchem du Instruktionen erhälst, wie du mit anderen Suchenden zusammengeführt wirst.\n
+  Sobald du in der App bist, kehrst du bitte auf diesen Server zurück und klickst im Kanal #lies-mich auf das Geschenk. Es erstellt sich dann ein weiteres Ticket, in welchem du Instruktionen erhälst, wie du mit anderen Suchenden zusammengeführt wirst, nur so kann unser System funktionieren..\n
 
   **WICHTIG**: Bitte halte dich unbedingt an diesen Prozess. Du profitierst mit deiner Einladung ebenfalls davon, lass' die anderen nicht hängen!\n
   Aktuell hast du 2 Einladungen. Diese werden verschickt, sobald man auf 'Invite' tippt. Pass' daher bitte auf, dass du dich nicht vertippst."
@@ -132,7 +132,7 @@ other_used_quitted: "Der andere User hat leider die Vermittlung abgebrochen, du 
 channel_timed_out: "Während der Vermittlung fand zu lange keine Konversation statt, du wirst zurück in die Warteschlange geführt."
 member_not_found: "Kein User angegeben, oder User nicht gefunden!"
 chanel_was_closed_by_team: "Die Vermittlung wurde vom Team abgebrochen."
-invite_user: "Sobald du deine Einladungen erhalten hast, kehrst du bitte auf diesen Server zurück und klickst im Kanal <#800729533015130143> auf das Geschenk.\nEs erstellt sich dann ein weiteres Ticket, in welchem du Instruktionen erhälst, wie du mit anderen Suchenden zusammengeführt wirst."
+invite_user: "Sobald du deine Einladungen erhalten hast, kehrst du bitte auf diesen Server zurück und klickst im Kanal <#800729533015130143> auf das Geschenk.\nEs erstellt sich dann ein weiteres Ticket, in welchem du Instruktionen erhälst, wie du mit anderen Suchenden zusammengeführt wirst, nur so kann unser System funktionieren.."
 channel_created: "Du wurdest mit {} in den Channel {} gesteckt!"
 read_again: "Du solltest den Text noch einmal durchlesen!"
 self_queue_status: "Du hast noch {} Einladungen zu vergeben!"
@@ -143,3 +143,4 @@ already_in_room: "Du befindest dich bereits in einem Vermittlungsraum!"
 invite_mode: "Du befindest dich derzeit im Einladen-Modus, diesen kannst du mit exit verlassen. Wenn du in einem Vermittlungschannel mit einem anderen User bist, führt das zu einem Ausschluss von dem Prozess!"
 rm_channel: "Der Channel wurde vom Team geschlossen!"
 back_to_queue: "Du wurdest vom Team wieder in die Warteschlange eingereiht!"
+reseted_by_team: "Du wurdest vom Team zurückgesetzt!"
