@@ -833,7 +833,6 @@ class Clubhouse(Cog, name="Clubhouse"):
         elif not not_coupled:
             await ctx.send("Keine gefunden!")
 
-
     @commands.command()
     @guild_only()
     async def reinit_reactions(self, ctx: Context):
