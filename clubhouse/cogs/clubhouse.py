@@ -801,7 +801,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             if len(out) > 1000:
                 await ctx.send(out)
                 out = ""
-        if out != "":
+        if out:
             await ctx.send(out)
 
         if not ignore_coupled:
