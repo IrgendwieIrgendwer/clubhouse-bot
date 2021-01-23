@@ -665,7 +665,9 @@ class Clubhouse(Cog, name="Clubhouse"):
         channel: TextChannel = ctx.channel
         user: discord.Member = ctx.author
         overwrite = channel.overwrites.get(user)
-        if ((await db_thread(db.get, Searcher, user.id) is None
+        if ((await db_thread(
+                lambda: db.query(Channel).filter_by(searcher_id=user.id, channel_id=channel.id).first()
+        ) is None
              or overwrite is None
              or not overwrite.read_messages
         ) and self.team_role not in user.roles):
