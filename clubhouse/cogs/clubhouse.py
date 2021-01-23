@@ -382,8 +382,6 @@ class Clubhouse(Cog, name="Clubhouse"):
                         await db_thread(db.delete, db_donator)
                         continue
 
-                    await self.team_channel.send(translations.f_paired_users(donator.mention, user.mention))
-
                     overwrites = {
                         self.guild.default_role: PermissionOverwrite(read_messages=False, view_channel=False),
                         self.guild.me: needed_permissions,
@@ -418,6 +416,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     )
                     await new_channel.send(embed=tutorial_embed)
 
+                    await self.team_channel.send(translations.f_paired_users(donator.mention, user.mention, new_channel.mention))
                     await self.send_dm_text(user, translations.f_channel_created(donator.mention, new_channel.mention))
                     await self.send_dm_text(donator, translations.f_channel_created(user.mention, new_channel.mention))
 
@@ -465,7 +464,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                         await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
                         other_id = searcher.user_id
                 if other_id != 0 and (other_user := self.bot.get_user(other_id)) is not None:
-                    await self.send_dm_text(other_user, translations.other_used_quitted)
+                    await self.send_dm_text(other_user, translations.f_other_used_quitted(member.mention))
 
                 channel: Optional[TextChannel] = self.bot.get_channel(db_channel.channel_id)
                 await db_thread(db.delete, db_channel)
@@ -616,7 +615,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                         await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
                         other_id = searcher.user_id
                 if other_id != 0 and (other_user := self.bot.get_user(other_id)) is not None:
-                    await self.send_dm_text(other_user, translations.other_used_quitted)
+                    await self.send_dm_text(other_user, translations.f_other_used_quitted(message.author.mention))
 
                 channel: Optional[TextChannel] = self.bot.get_channel(db_channel.channel_id)
                 await db_thread(db.delete, db_channel)
@@ -718,20 +717,20 @@ class Clubhouse(Cog, name="Clubhouse"):
             return
 
         channel: TextChannel = ctx.channel
-        user: discord.Member = ctx.author
+        author: discord.Member = ctx.author
 
         if channel.category is None or channel.category.id not in map(
                 lambda x: x.category_id, await db_thread(db.all, Category)):
-            await ctx.send(translations.f_wrong_channel(user.mention))
+            await ctx.send(translations.f_wrong_channel(author.mention))
             return
 
         db_channel: Optional[Channel] = await db_thread(db.get, Channel, channel.id)
-        if searcher := await db_thread(db.get, Searcher, user.id):
+        if searcher := await db_thread(db.get, Searcher, member.id):
             if searcher.user_id == member.id:
                 await db_thread(Searcher.change_state, db_channel.searcher_id, State.DONE)
             else:
                 await db_thread(Searcher.change_state, db_channel.searcher_id, State.QUEUED)
-        donator: Optional[Donator] = await db_thread(db.get, Donator, user.id)
+        donator: Optional[Donator] = await db_thread(db.get, Donator, member.id)
         if donator \
                 and donator.used_invites >= donator.invite_count \
                 and await db_thread(lambda: db.query(Channel).filter_by(donator_id=donator.user_id).count()) <= 1:
@@ -808,7 +807,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
                     other_id = searcher.user_id
                 if other_id != 0 and (other_user := self.bot.get_user(other_id)) is not None:
-                    await self.send_dm_text(other_user, translations.chanel_was_closed_by_team)
+                    await self.send_dm_text(other_user, translations.f_channel_was_closed_by_team(member.mention))
 
                 channel: Optional[TextChannel] = self.bot.get_channel(db_channel.channel_id)
                 await db_thread(db.delete, db_channel)
@@ -1211,7 +1210,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         channel: TextChannel = ctx.channel
         if channel.category is None or channel.category.id not in map(lambda x: x.category_id,
                                                                       await db_thread(db.all, Category)):
-            await ctx.send(translations.rm_channel)
+            await ctx.send(translations.f_rm_channel(member.mention))
             return
 
         db_channel = None
@@ -1237,7 +1236,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     other_id = searcher.user_id
 
             if other_id != 0 and (other_user := self.bot.get_user(other_id)) is not None:
-                await self.send_dm_text(other_user, translations.chanel_was_closed_by_team)
+                await self.send_dm_text(other_user, translations.f_channel_was_closed_by_team(member.mention))
 
             channel: Optional[TextChannel] = self.bot.get_channel(db_channel.channel_id)
             await db_thread(db.delete, db_channel)
@@ -1248,7 +1247,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 sentry_sdk.capture_exception(e)
         if db_channel:
             await self.pair()
-        await self.send_dm_text(member, translations.chanel_was_closed_by_team)
+        await self.send_dm_text(member, translations.f_channel_was_closed_by_team(member.mention))
 
     if getenv("DEBUG") == "true" or getenv("DEBUG") == 1:
         @commands.command(aliases=["del"])
