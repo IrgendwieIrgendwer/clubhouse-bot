@@ -53,6 +53,19 @@ gift = name_to_emoji["gift"]
 mag = name_to_emoji["mag"]
 channel_lock = Lock()
 queue_lock = Lock()
+needed_permissions = PermissionOverwrite(
+    read_messages=True,
+    send_messages=True,
+    add_reactions=True,
+    embed_links=True,
+    external_emojis=True,
+    manage_channels=True,
+    manage_messages=True,
+    read_message_history=True,
+    use_external_emojis=True,
+    view_channel=True,
+    manage_permissions=True
+)
 
 
 class Clubhouse(Cog, name="Clubhouse"):
@@ -80,6 +93,11 @@ class Clubhouse(Cog, name="Clubhouse"):
         found_categories: List[int] = []
         for category in categories:
             if category.name == "Vermittlung":
+                #if category.overwrites_for(self.guild.me) != needed_permissions:
+                #    await category.set_permissions(self.guild.me, overwrite=needed_permissions)
+                #for channel in category.channels:
+                #    if channel.overwrites_for(self.guild.me) != needed_permissions:
+                #        await channel.set_permissions(self.guild.me, overwrite=needed_permissions)
                 if category.id not in db_categories:
                     await db_thread(Category.create, category_id=category.id)
                 found_categories.append(category.id)
@@ -367,11 +385,11 @@ class Clubhouse(Cog, name="Clubhouse"):
                     await self.team_channel.send(translations.f_paired_users(donator.mention, user.mention))
 
                     overwrites = {
-                        self.guild.default_role: PermissionOverwrite(read_messages=False),
-                        self.guild.me: PermissionOverwrite(read_messages=True),
-                        user: PermissionOverwrite(read_messages=True),
-                        donator: PermissionOverwrite(read_messages=True),
-                        self.team_role: PermissionOverwrite(read_messages=True)
+                        self.guild.default_role: PermissionOverwrite(read_messages=False, view_channel=False),
+                        self.guild.me: needed_permissions,
+                        user: PermissionOverwrite(read_messages=True, view_channel=True),
+                        donator: PermissionOverwrite(read_messages=True, view_channel=True),
+                        self.team_role: PermissionOverwrite(read_messages=True, view_channel=True)
                     }
 
                     categories: List[Category] = await db_thread(db.all, Category)
@@ -475,10 +493,16 @@ class Clubhouse(Cog, name="Clubhouse"):
             if user.state == State.INITIAL:
                 await self.send_dm_text(member, translations.read_again)
             elif user.state == State.QUEUED:
-                await self.send_dm_text(member, translations.self_still_in_queue)
+                searching_user, _ = await self.calculate_queues()
+                index = 0
+                for searcher in searching_user:
+                    index += 1
+                    if searcher.user_id == member.id:
+                        break
+                await self.send_dm_text(member, translations.f_self_still_in_queue(index))
             elif user.state == State.MATCHED:
                 ret = False
-                await self.send_dm_text(member, translations.self_still_in_queue)
+                await self.send_dm_text(member, translations.invite_mode)
             if ret:
                 return
         user = await db_thread(db.get, Donator, member.id)
@@ -514,7 +538,13 @@ class Clubhouse(Cog, name="Clubhouse"):
             if user.state == State.INITIAL:
                 await self.send_dm_text(member, translations.read_again)
             elif user.state == State.QUEUED:
-                await self.send_dm_text(member, translations.self_still_in_queue)
+                searching_users, _ = await self.calculate_queues()
+                index = 0
+                for searcher in searching_users:
+                    index += 1
+                    if searcher.user_id == member.id:
+                        break
+                await self.send_dm_text(member, translations.f_self_still_in_queue(index))
             elif user.state == State.MATCHED:
                 await self.send_dm_text(member, translations.already_in_room)
             return
@@ -601,7 +631,7 @@ class Clubhouse(Cog, name="Clubhouse"):
 
         if message.guild is None:
             if isinstance(user, Donator) and user.state == State.INITIAL:
-                matcher = match(r"(\d).*", message.content)
+                matcher = match(r"(\d+).*", message.content)
                 if len(matcher.groups()) == 0 or not 1 <= int(matcher.groups()[0]) <= 5:
                     await self.send_dm_text(message.author, translations.gift_invalid_input)
                     return
@@ -1066,7 +1096,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 .first()
         )
         if searcher:
-            await db_thread(Searcher.change_timestamp, user_id=member.id, timestamp=datetime(190, 1, 1, 0, 0, 0))
+            await db_thread(Searcher.change_timestamp, user_id=member.id, timestamp=datetime(1970, 1, 1, 0, 0, 0))
             await ctx.send(f"Moved {member.mention} to the top of the queue.")
             return
 
@@ -1076,7 +1106,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 .first()
         )
         if donator:
-            await db_thread(Donator.change_timestamp, user_id=member.id, timestamp=datetime(190, 1, 1, 0, 0, 0))
+            await db_thread(Donator.change_timestamp, user_id=member.id, timestamp=datetime(1970, 1, 1, 0, 0, 0))
             await ctx.send(f"Moved {member.mention} to the top of the queue.")
             return
         await ctx.send(translations.f_user_not_found(member.mention))
