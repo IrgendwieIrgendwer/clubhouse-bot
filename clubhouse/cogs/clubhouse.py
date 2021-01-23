@@ -767,13 +767,11 @@ class Clubhouse(Cog, name="Clubhouse"):
         if self.team_role not in ctx.author.roles:
             await ctx.send(translations.f_permission_denied(ctx.author.mention))
             return
-
-        searching_users: str = "\n".join(f"<@{user.user_id}>" for user in await db_thread(
-            lambda: db.query(Searcher).filter_by(state=State.QUEUED)))
+        searching_users: str = "\n".join(f"<@{user.user_id}>" for user in (await self.calculate_queues())[0])
 
         active_donator_list: str = "\n".join(
-            f"<@{user.user_id}> ({user.invite_count - user.used_invites})" for user in await db_thread(
-                lambda: db.query(Donator).filter_by(state=State.QUEUED)))
+            f"<@{user.user_id}> ({user.invite_count - user.used_invites})"
+            for user in (await self.calculate_queues())[1])
 
         embed: discord.Embed = discord.Embed(title="Warteschlange", color=0x1bcc79)
         embed.add_field(name="Suchende User", value=searching_users or "Keine suchenden User", inline=True)
@@ -989,9 +987,19 @@ class Clubhouse(Cog, name="Clubhouse"):
                 .first()
         )
         if searcher:
+            position = ""
+            if searcher.state == State.QUEUED:
+                searching_users, _ = await self.calculate_queues()
+                index = 0
+                for searcher2 in searching_users:
+                    index += 1
+                    if searcher2.user_id == searcher.user_id:
+                        break
+                position = f"\nPosition: {index}"
             embed: discord.Embed = discord.Embed(
                 title=f"Searcher Status",
-                description=f"User: <@{searcher.user_id}>\nState: {searcher.state}"
+                description=f"User: <@{searcher.user_id}>\nState: {searcher.state}{position}"
+                            f"\nIn Warteschlange aufgenommen: {searcher.enqueued_at.strftime('%H:%M:%S %d.%m.%Y')}"
             )
             await ctx.send(embed=embed)
 
@@ -1001,12 +1009,19 @@ class Clubhouse(Cog, name="Clubhouse"):
                 .first()
         )
         if donator:
+            if donator.state == State.QUEUED:
+                _, donating_users = await self.calculate_queues()
+                index = 0
+                for donator2 in donating_users:
+                    index += 1
+                    if donator2.user_id == donator.user_id:
+                        break
             used_count = donator.invite_count - donator.used_invites
             used = f' (noch {used_count} von {donator.invite_count} Einladungen verfügbar.)'
             description = f"User: <@{donator.user_id}>\nState: {donator.state}"
             description += {
                 State.INITIAL: "",
-                State.QUEUED: used,
+                State.QUEUED: used + f"\nPosition: {index}",
                 State.MATCHED: used,
                 State.DONE: f" ({donator.invite_count} Einladungen)",
                 State.ABORTED: used,
