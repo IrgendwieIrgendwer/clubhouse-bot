@@ -26,6 +26,6 @@ class Searcher(db.Base):
         row.state = state
 
     @staticmethod
-    def set_timestamp(user_id: int):
+    def change_timestamp(user_id: int, timestamp: datetime):
         row: Searcher = db.get(Searcher, user_id)
-        row.enqueued_at = datetime.utcnow()
+        row.enqueued_at = timestamp

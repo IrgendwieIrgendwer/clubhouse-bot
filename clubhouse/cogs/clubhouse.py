@@ -616,7 +616,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 if user.state == State.INITIAL:
                     if message.content.lower() == "apple":
                         await db_thread(Searcher.change_state, user.user_id, State.QUEUED)
-                        await db_thread(Searcher.set_timestamp, user.user_id)
+                        await db_thread(Searcher.change_timestamp, user.user_id, datetime.utcnow())
                         await self.send_dm_text(message.author, translations.mag_added_queue)
                         await self.pair()
                     else:
@@ -676,13 +676,14 @@ class Clubhouse(Cog, name="Clubhouse"):
         if ctx.message.author.bot:
             return
 
+        if self.team_role not in ctx.author.roles:
+            await ctx.send(translations.f_permission_denied(ctx.author.mention))
+            return
+
         if not member:
             await ctx.send(translations.member_not_found)
             return
 
-        if self.team_role not in ctx.author.roles:
-            await ctx.send(translations.f_permission_denied(ctx.author.mention))
-            return
         found = 0
         user: Optional[Donator] = await db_thread(db.get, Donator, member.id)
         if user:
@@ -767,6 +768,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         if self.team_role not in ctx.author.roles:
             await ctx.send(translations.f_permission_denied(ctx.author.mention))
             return
+
         searching_users: str = "\n".join(f"<@{user.user_id}>" for user in (await self.calculate_queues())[0])
 
         active_donator_list: str = "\n".join(
@@ -785,10 +787,10 @@ class Clubhouse(Cog, name="Clubhouse"):
         team only
         get length of direct message queue
         """
-        if ctx.message.author.bot:
-            return
         if self.team_role not in ctx.author.roles:
             await ctx.send(translations.f_permission_denied(ctx.author.mention))
+            return
+        if ctx.message.author.bot:
             return
 
         await ctx.send(f"Anzahl: {len(self.task_set)}")
@@ -885,6 +887,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         if self.team_role not in ctx.author.roles:
             await ctx.send(translations.f_permission_denied(ctx.author.mention))
             return
+
         if ctx.channel.category is None or ctx.channel.category.id not in map(
                 lambda x: x.category_id, await db_thread(db.all, Category)):
             await ctx.send(translations.f_wrong_channel(ctx.author.mention))
@@ -973,12 +976,12 @@ class Clubhouse(Cog, name="Clubhouse"):
         if ctx.message.author.bot:
             return
 
-        if not member:
-            await ctx.send(translations.member_not_found)
-            return
-
         if self.team_role not in ctx.author.roles:
             await ctx.send(translations.f_permission_denied(ctx.author.mention))
+            return
+
+        if not member:
+            await ctx.send(translations.member_not_found)
             return
 
         searcher: Optional[Searcher] = await db_thread(
@@ -1038,6 +1041,47 @@ class Clubhouse(Cog, name="Clubhouse"):
             await ctx.send(translations.f_user_not_found(member.mention))
             return
 
+    @commands.command(aliases=["mtt"])
+    @guild_only()
+    async def move_to_top(self, ctx: Context, member: Optional[Member]):
+        """
+        team only
+        move member to the to of its queue
+        """
+
+        if ctx.message.author.bot:
+            return
+
+        if self.team_role not in ctx.author.roles:
+            await ctx.send(translations.f_permission_denied(ctx.author.mention))
+            return
+
+        if not member:
+            await ctx.send(translations.member_not_found)
+            return
+
+        searcher: Optional[Searcher] = await db_thread(
+            lambda: db.query(Searcher)
+                .filter_by(user_id=member.id)
+                .first()
+        )
+        if searcher:
+            await db_thread(Searcher.change_timestamp, user_id=member.id, timestamp=datetime(190, 1, 1, 0, 0, 0))
+            await ctx.send(f"Moved {member.mention} to the top of the queue.")
+            return
+
+        donator: Optional[Donator] = await db_thread(
+            lambda: db.query(Donator)
+                .filter_by(user_id=member.id)
+                .first()
+        )
+        if donator:
+            await db_thread(Donator.change_timestamp, user_id=member.id, timestamp=datetime(190, 1, 1, 0, 0, 0))
+            await ctx.send(f"Moved {member.mention} to the top of the queue.")
+            return
+        await ctx.send(translations.f_user_not_found(member.mention))
+
+
     @commands.command()
     @guild_only()
     async def rm(self, ctx: Context, member: Optional[Member]):
@@ -1047,11 +1091,11 @@ class Clubhouse(Cog, name="Clubhouse"):
         """
         if ctx.message.author.bot:
             return
-        if not member:
-            await ctx.send(translations.member_not_found)
-            return
         if self.team_role not in ctx.author.roles:
             await ctx.send(translations.f_permission_denied(ctx.author.mention))
+            return
+        if not member:
+            await ctx.send(translations.member_not_found)
             return
 
         user: Union[Donator, Searcher] = await db_thread(
