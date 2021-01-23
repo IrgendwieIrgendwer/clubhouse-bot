@@ -699,12 +699,12 @@ class Clubhouse(Cog, name="Clubhouse"):
         except (Forbidden, NotFound, HTTPException):
             pass
 
-    @commands.command(aliases=["r"])
+    @commands.command()
     @guild_only()
-    async def reset(self, ctx: Context, member: Optional[Member]):
+    async def done(self, ctx: Context, member: Optional[Member]):
         """
-        team only
-        resets the database for a user (e.g. clicked on wrong reaction, or was banned from the process)
+        teamler only
+        closes channel, marks member as completed and puts other one back into queue
         """
         if ctx.message.author.bot:
             return
@@ -716,6 +716,72 @@ class Clubhouse(Cog, name="Clubhouse"):
         if not member:
             await ctx.send(translations.member_not_found)
             return
+
+        channel: TextChannel = ctx.channel
+        user: discord.Member = ctx.author
+
+        if channel.category is None or channel.category.id not in map(
+                lambda x: x.category_id, await db_thread(db.all, Category)):
+            await ctx.send(translations.f_wrong_channel(user.mention))
+            return
+
+        db_channel: Optional[Channel] = await db_thread(db.get, Channel, channel.id)
+        if searcher := await db_thread(db.get, Searcher, user.id):
+            if searcher.user_id == member.id:
+                await db_thread(Searcher.change_state, db_channel.searcher_id, State.DONE)
+            else:
+                await db_thread(Searcher.change_state, db_channel.searcher_id, State.QUEUED)
+        donator: Optional[Donator] = await db_thread(db.get, Donator, user.id)
+        if donator \
+                and donator.used_invites >= donator.invite_count \
+                and await db_thread(lambda: db.query(Channel).filter_by(donator_id=donator.user_id).count()) <= 1:
+            await db_thread(Donator.change_state, db_channel.donator_id, State.DONE)
+        if db_channel:
+            users_to_notify: List[discord.Member] = [
+                u for u, o in channel.overwrites.items()
+                if isinstance(u, discord.Member) and u.id in [db_channel.searcher_id, db_channel.searcher_id]
+            ]
+            for user_to_notify in users_to_notify:
+                await self.send_dm_text(user_to_notify, translations.invite_user)
+        try:
+            await db_thread(db.delete, db_channel)
+            await channel.delete()
+        except (Forbidden, NotFound, HTTPException):
+            pass
+
+    @commands.command(aliases=["r"])
+    @guild_only()
+    async def reset(self, ctx: Context, member: Optional[Member], force: Optional[bool]=False):
+        """
+        team only
+        resets the database for a user (e.g. clicked on wrong reaction, or was banned from the process)
+        force overwrites warning when user is in multiple channels
+        """
+        if ctx.message.author.bot:
+            return
+
+        if self.team_role not in ctx.author.roles:
+            await ctx.send(translations.f_permission_denied(ctx.author.mention))
+            return
+
+        if not member:
+            await ctx.send(translations.member_not_found)
+            return
+
+        db_channel = None
+        open_channels: List[Channel] = await db_thread(lambda: db.query(Channel).filter(or_(
+            member.id == Channel.donator_id,
+            member.id == Channel.searcher_id
+        )).all())
+        if len(open_channels) > 0 and not force:
+            if len(open_channels) > 1:
+                await ctx.send(translations.f_reset_multiple_channels(
+                    member.mention,
+                    " ".join(map(lambda x: "<#{}>".format(x[0]), open_channels))))
+                return
+            elif open_channels[0].channel_id != ctx.channel.id:
+                await ctx.send(translations.f_reset_one_channels(member.mention, open_channels[0].channel_id))
+                return
 
         found = 0
         user: Optional[Donator] = await db_thread(db.get, Donator, member.id)
@@ -730,11 +796,8 @@ class Clubhouse(Cog, name="Clubhouse"):
             await ctx.send(translations.f_user_not_found(member.mention))
             return
         else:
-            db_channel = None
-            for db_channel in await db_thread(lambda: db.query(Channel).filter(or_(
-                    member.id == Channel.donator_id,
-                    member.id == Channel.searcher_id
-            )).all()):
+            await ctx.send(translations.f_user_resetted(member.mention))
+            for db_channel in open_channels:
                 donator = await db_thread(db.get, Donator, db_channel.donator_id)
                 other_id = 0
                 if donator and member.id != donator.user_id:
@@ -749,13 +812,11 @@ class Clubhouse(Cog, name="Clubhouse"):
 
                 channel: Optional[TextChannel] = self.bot.get_channel(db_channel.channel_id)
                 await db_thread(db.delete, db_channel)
-                await ctx.send(translations.f_user_resetted(member.mention))
                 try:
                     if channel:
                         await channel.delete()
                 except Exception as e:
                     sentry_sdk.capture_exception(e)
-            await ctx.send(translations.f_user_resetted(member.mention))
             if db_channel:
                 await self.pair()
 

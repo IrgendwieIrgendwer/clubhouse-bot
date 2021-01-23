@@ -144,3 +144,5 @@ invite_mode: "Du befindest dich derzeit im Einladen-Modus, diesen kannst du mit 
 rm_channel: "Der Channel wurde vom Team geschlossen!"
 back_to_queue: "Du wurdest vom Team wieder in die Warteschlange eingereiht!"
 resetted_by_team: "Du wurdest vom Team zurückgesetzt!"
+reset_multiple_channels: "{0} hat mehrere offene Channels {1}, die beim Reset geschlossen würden!\nAlle beteiligten User außer {0} kommen zurück in die Warteschlange!\nBist du dir sicher? Dann führe den Command nochmal aus, und hänge `True` hinten an."
+reset_one_channels: "{0} hat einen offenen Channel <#{1}>, der beim Reset geschlossen würde!\nAlle beteiligten User außer {0} kommen zurück in die Warteschlange!\nBist du dir sicher? Dann führe den Command nochmal aus, und hänge `True` hinten an."
