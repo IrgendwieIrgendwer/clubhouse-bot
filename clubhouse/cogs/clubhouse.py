@@ -174,7 +174,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     except Exception as e:
                         sentry_sdk.capture_exception(e)
 
-    @tasks.loop(minutes=30)
+    @tasks.loop(seconds=30)
     async def inactive_channel_deleter_loop(self):
         # if last message (ignore bot messages) was longer than 8 hours ago
         change = False
@@ -725,16 +725,19 @@ class Clubhouse(Cog, name="Clubhouse"):
             return
 
         db_channel: Optional[Channel] = await db_thread(db.get, Channel, channel.id)
-        if searcher := await db_thread(db.get, Searcher, member.id):
-            if searcher.user_id == member.id:
-                await db_thread(Searcher.change_state, db_channel.searcher_id, State.DONE)
-            else:
-                await db_thread(Searcher.change_state, db_channel.searcher_id, State.QUEUED)
+        if await db_thread(db.get, Searcher, member.id):
+            await db_thread(Searcher.change_state, db_channel.searcher_id, State.DONE)
+        else:
+            await db_thread(Searcher.change_state, db_channel.searcher_id, State.QUEUED)
         donator: Optional[Donator] = await db_thread(db.get, Donator, member.id)
         if donator \
                 and donator.used_invites >= donator.invite_count \
                 and await db_thread(lambda: db.query(Channel).filter_by(donator_id=donator.user_id).count()) <= 1:
             await db_thread(Donator.change_state, db_channel.donator_id, State.DONE)
+        else:
+            donator = await db_thread(db.get, Donator, db_channel.donator_id)
+            if donator:
+                await db_thread(Donator.change_used_invites, donator.user_id, max(0, donator.used_invites - 1))
         if db_channel:
             users_to_notify: List[discord.Member] = [
                 u for u, o in channel.overwrites.items()
@@ -776,7 +779,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             if len(open_channels) > 1:
                 await ctx.send(translations.f_reset_multiple_channels(
                     member.mention,
-                    " ".join(map(lambda x: "<#{}>".format(x[0]), open_channels))))
+                    " ".join(map(lambda x: "<#{}>".format(x.channel_id), open_channels))))
                 return
             elif open_channels[0].channel_id != ctx.channel.id:
                 await ctx.send(translations.f_reset_one_channels(member.mention, open_channels[0].channel_id))
