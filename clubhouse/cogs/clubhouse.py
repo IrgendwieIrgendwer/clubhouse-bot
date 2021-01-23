@@ -1009,6 +1009,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 .first()
         )
         if donator:
+            index = 0
             if donator.state == State.QUEUED:
                 _, donating_users = await self.calculate_queues()
                 index = 0
