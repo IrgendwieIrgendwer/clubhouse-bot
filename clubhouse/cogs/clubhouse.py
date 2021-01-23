@@ -93,9 +93,9 @@ class Clubhouse(Cog, name="Clubhouse"):
         found_categories: List[int] = []
         for category in categories:
             if category.name == "Vermittlung":
-                #if category.overwrites_for(self.guild.me) != needed_permissions:
+                # if category.overwrites_for(self.guild.me) != needed_permissions:
                 #    await category.set_permissions(self.guild.me, overwrite=needed_permissions)
-                #for channel in category.channels:
+                # for channel in category.channels:
                 #    if channel.overwrites_for(self.guild.me) != needed_permissions:
                 #        await channel.set_permissions(self.guild.me, overwrite=needed_permissions)
                 if category.id not in db_categories:
@@ -631,8 +631,8 @@ class Clubhouse(Cog, name="Clubhouse"):
 
         if message.guild is None:
             if isinstance(user, Donator) and user.state == State.INITIAL:
-                matcher = match(r"(\d+).*", message.content)
-                if len(matcher.groups()) == 0 or not 1 <= int(matcher.groups()[0]) <= 5:
+                matcher = match(r"(\d+)", message.content)
+                if not matcher or len(matcher.groups()) == 0 or not 1 <= int(matcher.groups()[0]) <= 5:
                     await self.send_dm_text(message.author, translations.gift_invalid_input)
                     return
                 await db_thread(lambda:
@@ -665,7 +665,8 @@ class Clubhouse(Cog, name="Clubhouse"):
         channel: TextChannel = ctx.channel
         user: discord.Member = ctx.author
         overwrite = channel.overwrites.get(user)
-        if ((overwrite is None
+        if ((await db_thread(db.get, Searcher, user.id) is None
+             or overwrite is None
              or not overwrite.read_messages
         ) and self.team_role not in user.roles):
             await ctx.send(translations.f_chanenl_delete_denied(user.mention))
@@ -752,6 +753,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                         await channel.delete()
                 except Exception as e:
                     sentry_sdk.capture_exception(e)
+            await ctx.send(translations.f_user_resetted(member.mention))
             if db_channel:
                 await self.pair()
 
@@ -1110,7 +1112,6 @@ class Clubhouse(Cog, name="Clubhouse"):
             await ctx.send(f"Moved {member.mention} to the top of the queue.")
             return
         await ctx.send(translations.f_user_not_found(member.mention))
-
 
     @commands.command()
     @guild_only()

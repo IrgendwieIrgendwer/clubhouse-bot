@@ -112,7 +112,7 @@ tutorial_embed_description: "
   **Anleitung**:\n
   - {0} schickt seine Telefonnummer an {1} (hier oder per DM). Achtet darauf, dass ihr die Nummer **im Internationalen Format** speichert (Statt ~~`0172...`~~ speichert ihr `+49172...`).\n
   - Nachdem {0} seine Einladung erhalten hat, erstellt er seinen Account.\n
-  - Wenn alles funktioniert hat, gibt einer von euch `.close` ein, um den Channel zu löschen.\n
+  - {0} Wenn alles funktioniert hat, und du Zugriff auf die Channels in der App hast, gibst du `.close` ein, um den Channel zu löschen.\n
   \n
   Falls ihr Unterstützung benötigt: @Team
   "
