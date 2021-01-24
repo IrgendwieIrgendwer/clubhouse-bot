@@ -247,7 +247,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             category_channel: Optional[CategoryChannel] = self.bot.get_channel(category.category_id)
             if category_channel is None:
                 await db_thread(db.delete, category)
-                await self.send_to_dump(f"Kategorie <#{category.id}> {category.id} aus der Datenbank gelöscht")
+                await self.send_to_dump(f"Kategorie <#{category.id}> ({category.id}) aus der Datenbank gelöscht")
                 continue
             for channel in category_channel.channels:
                 if channel.type != ChannelType.text:
@@ -440,23 +440,13 @@ class Clubhouse(Cog, name="Clubhouse"):
             await asyncio.sleep(5)
 
     async def calculate_queues(self) -> Tuple[List[Searcher], List[Donator]]:
-        async def sort_users(x: Union[Donator, Searcher, None] = None, y: Union[Donator, Searcher, None] = None) -> int:
+        def sort_users(x: Union[Donator, Searcher, None] = None, y: Union[Donator, Searcher, None] = None) -> int:
             if x is None:
                 return 1
             if y is None:
                 return -1
             user_x: Optional[discord.Member] = self.guild.get_member(x.user_id)
             user_y: Optional[discord.Member] = self.guild.get_member(y.user_id)
-            if user_x is None:
-                await db_thread(db.delete, user_x)
-                await self.send_to_dump(f"User <@{x.user_id}> ({x.user_id}) aus der Datenbank gelöscht "
-                                        f"(als Discord User nicht gefunden)!")
-                return 1
-            if user_y is None:
-                await db_thread(db.delete, user_y)
-                await self.send_to_dump(f"User <@{y.user_id}> ({y.user_id}) aus der Datenbank gelöscht "
-                                        f"(als Discord User nicht gefunden)!")
-                return -1
             if user_x.status == Status.offline and user_y.status == Status.offline \
                     or user_x.status != Status.offline and user_y.status != Status.offline:
                 if isinstance(x, Donator) and isinstance(y, Donator):
@@ -477,6 +467,18 @@ class Clubhouse(Cog, name="Clubhouse"):
         searching_users: List[Searcher] = await db_thread(
             lambda: db.query(Searcher).filter_by(state=State.QUEUED).all())
 
+        for u in searching_users:
+            if self.guild.get_member(u.user_id) is None:
+                await db_thread(db.delete, u)
+                await self.send_to_dump(f"User <@{u.user_id}> ({u.user_id}) aus der Datenbank gelöscht "
+                                        f"(als Discord User nicht gefunden)!")
+
+        for u in donating_users:
+            if self.guild.get_member(u.user_id) is None:
+                await db_thread(db.delete, u)
+                await self.send_to_dump(f"User <@{u.user_id}> ({u.user_id}) aus der Datenbank gelöscht "
+                                        f"(als Discord User nicht gefunden)!")
+
         if donating_users:
             donating_users.sort(key=cmp_to_key(sort_users))
         if searching_users:
@@ -496,7 +498,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 user: Optional[discord.Member] = self.guild.get_member(db_user.user_id)
                 if not user:
                     await db_thread(db.delete, db_user)
-                    await self.send_to_dump(f"Searcher <@{db_user.user_id}> {db_user.user_id}"
+                    await self.send_to_dump(f"Searcher <@{db_user.user_id}> ({db_user.user_id})"
                                             f" aus der Datenbank gelöscht (als Discord User nicht gefunden)!")
                     continue
                 while len(donating_users) > 0:
@@ -505,7 +507,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     if not donator:
                         del donating_users[0]
                         await db_thread(db.delete, db_donator)
-                        await self.send_to_dump(f"Donator <@{db_donator.user_id}> {db_donator.user_id}"
+                        await self.send_to_dump(f"Donator <@{db_donator.user_id}> ({db_donator.user_id})"
                                                 f" aus der Datenbank gelöscht (als Discord User nicht gefunden)!")
                         continue
 
@@ -522,7 +524,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                         category_channel: Optional[CategoryChannel] = self.bot.get_channel(category.category_id)
                         if category_channel is None:
                             await db_thread(db.delete, category)
-                            await self.send_to_dump(f"Kategorie <#{category.id}> {category.id}"
+                            await self.send_to_dump(f"Kategorie <#{category.id}> ({category.id})"
                                                     f" aus der Datenbank gelöscht")
                             continue
                         if len(category_channel.channels) < 50:
@@ -554,14 +556,14 @@ class Clubhouse(Cog, name="Clubhouse"):
                         del donating_users[0]
                     await db_thread(db_donator.change_used_invites, db_donator.user_id, db_donator.used_invites + 1)
                     await self.send_to_dump(
-                        f"Donator <@{donator.id}> {donator.id}"
+                        f"Donator <@{donator.id}> ({donator.id})"
                         f" hat jetzt  {max(0, db_donator.used_invites - 1)}"
                         f" Einladungen verbraucht. (Vermittelt)")
                     db_donator.used_invites += 1
                     await db_thread(Donator.change_state, donator.id, State.MATCHED)
-                    await self.send_to_dump(f"Donator <@{donator.id}> {donator.id} auf MATCHED gesetzt")
+                    await self.send_to_dump(f"Donator <@{donator.id}> ({donator.id}) auf MATCHED gesetzt")
                     await db_thread(Searcher.change_state, user.id, State.MATCHED)
-                    await self.send_to_dump(f"Searcher <@{user.id}> {user.id} auf MATCHED gesetzt")
+                    await self.send_to_dump(f"Searcher <@{user.id}> ({user.id}) auf MATCHED gesetzt")
                     break
 
     async def on_member_remove(self, member: Member):
@@ -573,7 +575,7 @@ class Clubhouse(Cog, name="Clubhouse"):
 
             if user.state in [State.INITIAL, State.QUEUED]:
                 await db_thread(db.delete, user)
-                await self.send_to_dump(f"User <@{member.id}> {member.id} aus der Datenbank gelöscht "
+                await self.send_to_dump(f"User <@{member.id}> ({member.id}) aus der Datenbank gelöscht "
                                         f"(hat den Server verlassen)!")
                 continue
 
@@ -590,7 +592,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 if donator:
                     if member.id == donator.user_id:
                         await db_thread(Donator.change_state, member.id, State.ABORTED)
-                        await self.send_to_dump(f"Donator <@{donator.id}> {donator.id} auf ABORTED gesetzt"
+                        await self.send_to_dump(f"Donator <@{donator.id}> ({donator.id}) auf ABORTED gesetzt"
                                                 f" (hat den Server verlassen)")
                     else:
                         other_id = donator.user_id
