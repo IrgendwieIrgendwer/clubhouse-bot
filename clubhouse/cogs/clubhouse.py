@@ -446,7 +446,11 @@ class Clubhouse(Cog, name="Clubhouse"):
             if y is None:
                 return -1
             user_x: Optional[discord.Member] = self.guild.get_member(x.user_id)
+            if user_x is None:
+                return 1
             user_y: Optional[discord.Member] = self.guild.get_member(y.user_id)
+            if user_y is None:
+                return -1
             if user_x.status == Status.offline and user_y.status == Status.offline \
                     or user_x.status != Status.offline and user_y.status != Status.offline:
                 if isinstance(x, Donator) and isinstance(y, Donator):
@@ -466,20 +470,6 @@ class Clubhouse(Cog, name="Clubhouse"):
 
         searching_users: List[Searcher] = await db_thread(
             lambda: db.query(Searcher).filter_by(state=State.QUEUED).all())
-
-        for i, u in enumerate(searching_users):
-            if self.guild.get_member(u.user_id) is None:
-                await db_thread(db.delete, u)
-                del searching_users[i]
-                await self.send_to_dump(f"User <@{u.user_id}> ({u.user_id}) aus der Datenbank gelöscht "
-                                        f"(als Discord User nicht gefunden)!")
-
-        for i, u in enumerate(donating_users):
-            if self.guild.get_member(u.user_id) is None:
-                await db_thread(db.delete, u)
-                del donating_users[i]
-                await self.send_to_dump(f"User <@{u.user_id}> ({u.user_id}) aus der Datenbank gelöscht "
-                                        f"(als Discord User nicht gefunden)!")
 
         if donating_users:
             donating_users.sort(key=cmp_to_key(sort_users))
