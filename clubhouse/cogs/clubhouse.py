@@ -100,9 +100,11 @@ class Clubhouse(Cog, name="Clubhouse"):
             if member:
                 return member.name
             return "unknown"
-
+        if isinstance(s, str):
         # lambda x: r"<@\1> ({})".format(get_member(x.group()))
-        y = re.sub(r'<@\\!?(\d*?)>', lambda x: r"<@\1> ({})".format(get_member(x.group())), s)
+            y = re.sub(r'<@\\!?(\d*?)>', lambda x: r"<@\1> ({})".format(get_member(x.group())), s)
+        else:
+            y = ""
         return y
 
     async def on_ready(self):
