@@ -133,10 +133,10 @@ class Clubhouse(Cog, name="Clubhouse"):
                     await db_thread(Category.create, category_id=category.id)
                     await self.send_to_dump(f"Category <#{category.id}> ({category.id}) added to database")
                 found_categories.append(category.id)
-        for category_id in set(db_categories.keys()).difference(set(found_categories)):
+        for i, category_id in enumerate(list(set(db_categories.keys()).difference(set(found_categories)))):
             await db_thread(db.delete, db_categories.get(category_id))
             await self.send_to_dump(f"Kategorie <#{category_id}> ({category_id}) aus der Datenbank gelöscht")
-            del db_categories[category_id]
+            del db_categories[i]
 
         try:
             if found_categories == 0:
@@ -467,14 +467,14 @@ class Clubhouse(Cog, name="Clubhouse"):
         searching_users: List[Searcher] = await db_thread(
             lambda: db.query(Searcher).filter_by(state=State.QUEUED).all())
 
-        for u in searching_users:
+        for i, u in enumerate(searching_users):
             if self.guild.get_member(u.user_id) is None:
                 await db_thread(db.delete, u)
                 del searching_users[i]
                 await self.send_to_dump(f"User <@{u.user_id}> ({u.user_id}) aus der Datenbank gelöscht "
                                         f"(als Discord User nicht gefunden)!")
 
-        for u in donating_users:
+        for i, u in enumerate(donating_users):
             if self.guild.get_member(u.user_id) is None:
                 await db_thread(db.delete, u)
                 del donating_users[i]
