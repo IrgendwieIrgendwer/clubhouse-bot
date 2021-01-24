@@ -482,8 +482,7 @@
     <div class=info__metadata>
         <div class=info__guild-name>{{ guild['name'] }}</div>
         <div class=info__channel-name>#{{ channel_name }}</div>
-        <div class=info__channel-message-count>{{ messages|length }} Nachricht{% if messages|length > 1 %}
-            en{% endif %}</div>
+        <div class=info__channel-message-count>{{ messages|length }} Nachricht{% if messages|length > 1 %}en{% endif %}</div>
     </div>
 </div>
 <div class=chatlog>
@@ -508,7 +507,7 @@
                     <span class=chatlog__timestamp>{{ msg['timestamp'] }}</span>
                     <div class=chatlog__message id=message-{{ msg['id'] }} data-message-id={{ msg['id'] }}>
                     <div class=chatlog__content>
-                        <span class=markdown>{{ msg['content']|regexr }} </span>
+                        <span class=markdown>{{ msg['content']|regexr|markdown }} </span>
                         <span></span>
                     </div>
                 {% endif %}
@@ -518,16 +517,16 @@
                         <div class=chatlog__embed-content-container>
                             <div class=chatlog__embed-content>
                                 <div class=chatlog__embed-text>
-                                    <div class=chatlog__embed-title><span class=markdown>{{ e['title'] }}</span></div>
+                                    <div class=chatlog__embed-title><span class=markdown>{{ e['title']|markdown }}</span></div>
                                     <div class=chatlog__embed-description><span
-                                            class=markdown>{{ e['description']|regexr }}</span></div>
+                                            class=markdown>{{ e['description']|regexr|markdown }}</span></div>
                                     {% if e['fields'] %}
                                         <div class=chatlog__embed-fields>
                                             {% for f in e['fields'] %}
                                                 <div class=chatlog__embed-field-name><span
-                                                        class=markdown>{{ f['title'] }} </span></div><br>
+                                                        class=markdown>{{ f['title']|markdown }} </span></div><br>
                                                 <div class=chatlog__embed-field-value><span
-                                                        class=markdown>{{ f['description']|regexr }}</span></div>
+                                                        class=markdown>{{ f['description']|regexr|markdown }}</span></div>
                                             {% endfor %}
                                         </div>
                                     {% endif %}
