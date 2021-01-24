@@ -1,8 +1,10 @@
 import asyncio
+import re
 from asyncio import Lock
 from datetime import datetime, timedelta
 from functools import cmp_to_key
-from os import getenv
+from os import getenv, remove
+from pathlib import Path
 from re import match
 from typing import Optional, Union, List, Dict, Tuple
 
@@ -14,13 +16,15 @@ from PyDrocsid.events import StopEventHandling
 from PyDrocsid.translations import translations
 from PyDrocsid.util import send_long_embed
 from discord import Message, Role, PartialEmoji, TextChannel, Member, NotFound, Embed, HTTPException, Forbidden, Guild, \
-    CategoryChannel, PermissionOverwrite, ChannelType, Status
+    CategoryChannel, PermissionOverwrite, ChannelType, Status, Reaction, File
 from discord.ext import commands, tasks
 from discord.ext.commands import Cog, Bot, guild_only, Context
 from discord.utils import snowflake_time
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import or_
 
 from colours import Colours
+from jinja_utils import regex_replace
 from models.category import Category
 from models.channel import Channel
 from models.donator import Donator
@@ -31,6 +35,7 @@ from util import get_prefix
 start_message_link = getenv("MESSAGE_LINK")
 team_role_id = getenv("TEAM_ROLE_ID")
 team_channel_id = getenv("TEAM_CHANNEL_ID")
+bot_dump_chanel_id = getenv("BOT_DUMP_CHANNEL_ID")
 
 lst = start_message_link.split("/")
 if not len(lst) == 7 or not lst[-2].isnumeric() or not lst[-1].isnumeric():
@@ -45,8 +50,11 @@ if not team_role_id.isnumeric():
 if not team_channel_id.isnumeric():
     print("ERROR: team channel id should be a number")
     exit(1)
+if not bot_dump_chanel_id.isnumeric():
+    bot_dump_chanel_id = team_channel_id
 
 team_channel_id = int(team_channel_id)
+bot_dump_chanel_id = int(bot_dump_chanel_id)
 team_role_id = int(team_role_id)
 
 gift = name_to_emoji["gift"]
@@ -72,6 +80,7 @@ class Clubhouse(Cog, name="Clubhouse"):
     def __init__(self, bot: Bot):
         self.bot = bot
         self.team_channel: Union[TextChannel, None] = None
+        self.bot_dump_channel: Union[TextChannel, None] = None
         self.guild: Optional[Guild] = None
         self.team_role: Optional[Role] = None
         self.task_set: set = set()
@@ -83,6 +92,9 @@ class Clubhouse(Cog, name="Clubhouse"):
         if self.team_channel is None:
             print("Unable to find team channel")
             exit(1)
+        self.bot_dump_channel = self.guild.get_channel(bot_dump_chanel_id)
+        if self.bot_dump_channel is None:
+            self.bot_dump_channel = self.team_channel
         self.team_role = self.guild.get_role(team_role_id)
         if self.team_role is None:
             print("Unable to find team role")
@@ -100,14 +112,17 @@ class Clubhouse(Cog, name="Clubhouse"):
                 #        await channel.set_permissions(self.guild.me, overwrite=needed_permissions)
                 if category.id not in db_categories:
                     await db_thread(Category.create, category_id=category.id)
+                    await self.send_to_dump(f"Category <#{category.id}> {category.id} added to database")
                 found_categories.append(category.id)
         for category_id in set(db_categories.keys()).difference(set(found_categories)):
             await db_thread(db.delete, db_categories.get(category_id))
+            await self.send_to_dump(f"Kategorie <#{category_id}> {category_id} aus der Datenbank gelöscht")
             del db_categories[category_id]
 
         try:
             if found_categories == 0:
                 category: CategoryChannel = await self.guild.create_category("Vermittlung")
+                await self.send_to_dump(f"Category <#{category.id}> {category.id} created and added to database")
                 await db_thread(Category.create, category.id)
         except Exception as e:
             sentry_sdk.capture_exception(e)
@@ -141,6 +156,71 @@ class Clubhouse(Cog, name="Clubhouse"):
         except RuntimeError:
             self.inactive_channel_reminder_loop.restart()
 
+    async def send_to_dump(self, text):
+        await self.bot_dump_channel.send(text)
+
+    async def chatlog(self, channel: TextChannel, reason: str):
+        return
+
+        def get_reaction_url(reaction: Reaction) -> str:
+            if isinstance(reaction.emoji, str):
+                return f"https://twemoji.maxcdn.com/2/72x72/{hex(ord(str(reaction.emoji)))[2:]}.png"
+            else:
+                return reaction.emoji.url
+
+        # create the chatlog report using jinja 2 template and send it to the team channel
+        filename = Path(f'/tmp/{channel.name}.html')
+        try:
+            guild: Dict[str, str] = {
+                "name": self.guild.name,
+                "icon": self.guild.icon_url,
+            }
+            messages: List[Dict[str, Union[str, dict, list]]] = list()
+            msg: Message
+            async for msg in channel.history(limit=2000, oldest_first=True):
+                messages.append({
+                    "id": msg.id,
+                    "bot": msg.author.bot,
+                    "attachments": msg.attachments,
+                    "embeds": [{
+                        "title": self.add_mention_suffix(embed.title),
+                        "description": self.add_mention_suffix(embed.description) if isinstance(embed.description,
+                                                                                                str) else "",
+                        "color": embed.color,
+                        "thumbnail": embed.thumbnail if isinstance(embed.thumbnail, str) else "",
+                        "fields": [{
+                            "title": self.add_mention_suffix(f.name),
+                            "description": self.add_mention_suffix(f.value),
+                        } for f in embed.fields]
+                    } for embed in msg.embeds],
+                    "author": {
+                        "id": msg.author.id,
+                        "name": msg.author.display_name,
+                        "avatar": msg.author.avatar_url,
+                    },
+                    "timestamp": msg.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    "content": self.add_mention_suffix(msg.content),
+                    "reactions": [
+                        {
+                            "emoji": reaction.emoji,
+                            "count": reaction.count,
+                            "src": get_reaction_url(reaction)
+                        } for reaction in msg.reactions
+                    ]
+                })
+
+            html_content = self.template.render(guild=guild, channel_name=channel.name, messages=messages)
+
+            with filename.open('w') as f:
+                f.write(html_content)
+
+            await self.team_channel.send(content=reason, file=File(str(filename)))
+        finally:
+            remove(filename)
+
+    # db updates -> log
+    # user updates -> log TODO
+
     @tasks.loop(hours=2)
     async def inactive_channel_reminder_loop(self):
         # if last message (ignore bot and team messages) was longer than 2 hours ago
@@ -150,6 +230,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             category_channel: Optional[CategoryChannel] = self.bot.get_channel(category.category_id)
             if category_channel is None:
                 await db_thread(db.delete, category)
+                await self.send_to_dump(f"Kategorie <#{category.id}> {category.id} aus der Datenbank gelöscht")
                 continue
             for channel in category_channel.channels:
                 if channel.type != ChannelType.text:
@@ -174,7 +255,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     except Exception as e:
                         sentry_sdk.capture_exception(e)
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(minutes=30)
     async def inactive_channel_deleter_loop(self):
         # if last message (ignore bot messages) was longer than 8 hours ago
         change = False
@@ -183,6 +264,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             category_channel: Optional[CategoryChannel] = self.bot.get_channel(category.category_id)
             if category_channel is None:
                 await db_thread(db.delete, category)
+                await self.send_to_dump(f"Kategorie <#{category.id}> {category.id}  aus der Datenbank gelöscht")
                 continue
             for channel in category_channel.channels:
                 if channel.type != ChannelType.text:
@@ -205,18 +287,30 @@ class Clubhouse(Cog, name="Clubhouse"):
                             if isinstance(u, discord.Member) and u.id in [db_channel.searcher_id, db_channel.donator_id]
                         ]
                         for user in users_to_notify:
-                            db_entry: Optional[Searcher] = await db_thread(db.get, Searcher, user.id)
-                            if db_entry:
+                            searcher: Optional[Searcher] = await db_thread(db.get, Searcher, user.id)
+                            if searcher:
+                                await self.send_to_dump(f"User <@{searcher.user_id}> {searcher.user_id}"
+                                                        f" wurde zurück auf QUEUED gesetzt"
+                                                        f" (Channel wg. Inaktivität gelöscht)")
                                 await db_thread(Searcher.change_state, user.id, State.QUEUED)
 
-                            db_entry: Optional[Donator] = await db_thread(db.get, Donator, user.id)
-                            if db_entry:
-                                await db_thread(Donator.change_state, user.id, State.MATCHED)
+                            donator: Optional[Donator] = await db_thread(db.get, Donator, user.id)
+                            if donator:
+                                await self.send_to_dump(
+                                    f"User <@{donator.user_id}> {donator.user_id}"
+                                    f" wurde zurück auf MATCHED gesetzt und hat jetzt "
+                                    f"{max(0, donator.used_invites - 1)}"
+                                    f" Einladungen verbraucht. (Channel wg. Inaktivität gelöscht)")
                                 await db_thread(Donator.change_used_invites, user.id,
-                                                max(0, db_entry.used_invites - 1))
+                                                max(0, donator.used_invites - 1))
                             await self.send_dm_text(user, translations.channel_timed_out)
                             change = True
                         try:
+                            await self.chatlog(channel, translations.f_chatlog_closed_reason(
+                                donator.user_id, self.guild.get_member(donator.user_id),
+                                searcher.user_id, self.guild.get_member(searcher.user_id),
+                                "Inactive Channel für 24 Stunden",
+                            ))
                             await channel.delete()
                             await db_thread(db.delete, db_channel)
                         except Exception as e:
@@ -330,10 +424,22 @@ class Clubhouse(Cog, name="Clubhouse"):
 
     async def calculate_queues(self) -> Tuple[List[Searcher], List[Donator]]:
         def sort_users(x: Union[Donator, Searcher, None] = None, y: Union[Donator, Searcher, None] = None) -> int:
+            if x is None:
+                return 1
             if y is None:
                 return -1
             user_x: Optional[discord.Member] = self.guild.get_member(x.user_id)
             user_y: Optional[discord.Member] = self.guild.get_member(y.user_id)
+            if user_x is None:
+                await db_thread(db.delete, user_x)
+                await self.send_to_dump(f"User <@{x.user_id}> {x.user_id} aus der Datenbank gelöscht "
+                                        f"(als Discord User nicht gefunden)!")
+                return 1
+            if user_y is None:
+                await db_thread(db.delete, user_y)
+                await self.send_to_dump(f"User <@{y.user_id}> {y.user_id} aus der Datenbank gelöscht "
+                                        f"(als Discord User nicht gefunden)!")
+                return -1
             if user_x.status == Status.offline and user_y.status == Status.offline \
                     or user_x.status != Status.offline and user_y.status != Status.offline:
                 if isinstance(x, Donator) and isinstance(y, Donator):
@@ -373,6 +479,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                 user: Optional[discord.Member] = self.guild.get_member(db_user.user_id)
                 if not user:
                     await db_thread(db.delete, db_user)
+                    await self.send_to_dump(f"Searcher <@{db_user.user_id}> {db_user.user_id}"
+                                            f" aus der Datenbank gelöscht (als Discord User nicht gefunden)!")
                     continue
                 while len(donating_users) > 0:
                     db_donator = donating_users[0]
@@ -380,6 +488,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                     if not donator:
                         del donating_users[0]
                         await db_thread(db.delete, db_donator)
+                        await self.send_to_dump(f"Donator <@{db_donator.user_id}> {db_donator.user_id}"
+                                                f" aus der Datenbank gelöscht (als Discord User nicht gefunden)!")
                         continue
 
                     overwrites = {
@@ -395,6 +505,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                         category_channel: Optional[CategoryChannel] = self.bot.get_channel(category.category_id)
                         if category_channel is None:
                             await db_thread(db.delete, category)
+                            await self.send_to_dump(f"Kategorie <#{category.id}> {category.id}"
+                                                    f" aus der Datenbank gelöscht")
                             continue
                         if len(category_channel.channels) < 50:
                             new_channel: TextChannel = await category_channel.create_text_channel(f"{user.name}",
@@ -423,9 +535,15 @@ class Clubhouse(Cog, name="Clubhouse"):
                     if db_donator.invite_count <= db_donator.used_invites + 1:
                         del donating_users[0]
                     await db_thread(db_donator.change_used_invites, db_donator.user_id, db_donator.used_invites + 1)
+                    await self.send_to_dump(
+                        f"Donator <@{donator.user_id}> {donator.user_id}"
+                        f" hat jetzt  {max(0, donator.used_invites - 1)}"
+                        f" Einladungen verbraucht. (Vermittelt)")
                     db_donator.used_invites += 1
                     await db_thread(Donator.change_state, donator.id, State.MATCHED)
+                    await self.send_to_dump(f"Donator <@{donator.id}> {donator.id} auf MATCHED gesetzt")
                     await db_thread(Searcher.change_state, user.id, State.MATCHED)
+                    await self.send_to_dump(f"Searcher <@{user.id}> {user.id} auf MATCHED gesetzt")
                     break
 
     async def on_member_remove(self, member: Member):
@@ -437,6 +555,8 @@ class Clubhouse(Cog, name="Clubhouse"):
 
             if user.state in [State.INITIAL, State.QUEUED]:
                 await db_thread(db.delete, user)
+                await self.send_to_dump(f"User <@{member.id}> {member.id} aus der Datenbank gelöscht "
+                                        f"(hat den Server verlassen)!")
                 continue
 
             if State.completed(user):
@@ -452,16 +572,25 @@ class Clubhouse(Cog, name="Clubhouse"):
                 if donator:
                     if member.id == donator.user_id:
                         await db_thread(Donator.change_state, member.id, State.ABORTED)
+                        await self.send_to_dump(f"Donator <@{donator.id}> {donator.id} auf ABORTED gesetzt"
+                                                f" (hat den Server verlassen)")
                     else:
                         other_id = donator.user_id
                     await db_thread(Donator.change_used_invites, donator.user_id,
                                     max(0, donator.used_invites - 1))
+                    await self.send_to_dump(f"Donator <@{donator.id}> {donator.id} hat nun"
+                                            f" {max(0, donator.used_invites - 1)} verbrauchte Einladungen"
+                                            f" (anderer User hat den Server verlassen)")
                 searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
                 if searcher:
                     if member.id == searcher.user_id:
                         await db_thread(Searcher.change_state, searcher.user_id, State.ABORTED)
+                        await self.send_to_dump(f"Donator <@{searcher.user_id}> {searcher.user_id} auf ABORTED gesetzt"
+                                                f" (hat den Server verlassen)")
                     else:
                         await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
+                        await self.send_to_dump(f"Donator <@{searcher.user_id}> {searcher.user_id} auf QUEUED gesetzt"
+                                                f"  (anderer User hat den Server verlassen)")
                         other_id = searcher.user_id
                 if other_id != 0 and (other_user := self.bot.get_user(other_id)) is not None:
                     await self.send_dm_text(other_user, translations.f_other_used_quitted(member.mention))
@@ -470,6 +599,11 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await db_thread(db.delete, db_channel)
                 try:
                     if channel:
+                        await self.chatlog(channel, translations.f_chatlog_closed_reason(
+                            donator.user_id, self.guild.get_member(donator.user_id),
+                            searcher.user_id, self.guild.get_member(searcher.user_id),
+                            f"<@{member.id}> hat der Server gerade verlassen!",
+                        ))
                         await channel.delete()
                 except Exception as e:
                     sentry_sdk.capture_exception(e)
@@ -589,6 +723,9 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await self.send_dm_text(message.author, translations.queue_left)
             if user.state in [State.INITIAL, State.QUEUED]:
                 await db_thread(db.delete, user)
+                await self.send_to_dump(f"User <@{user.user_id}> {user.user_id} aus der Datenbank gelöscht "
+                                        f"(hat `exit` eingegeben)!")
+                return
 
             if user.state != State.MATCHED:
                 return
@@ -602,17 +739,26 @@ class Clubhouse(Cog, name="Clubhouse"):
                 other_id = 0
                 if donator:
                     if message.author.id == donator.user_id:
+                        await self.send_to_dump(f"User <@{donator.user_id}> {donator.user_id} auf ABORTED gesetzt"
+                                                f" (hat `exit` eingegeben)!")
                         await db_thread(Donator.change_state, message.author.id, State.ABORTED)
                     else:
                         other_id = donator.user_id
+                    await self.send_to_dump(f"User <@{donator.user_id}> {donator.user_id} hat jetzt"
+                                            f" {max(0, donator.used_invites - 1)} verbrauchte Einladungen"
+                                            f" (anderer User hat `exit` eingegeben)!")
                     await db_thread(Donator.change_used_invites, donator.user_id,
                                     max(0, donator.used_invites - 1))
                 searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
                 if searcher:
                     if message.author.id == searcher.user_id:
                         await db_thread(Searcher.change_state, searcher.user_id, State.ABORTED)
+                        await self.send_to_dump(f"User <@{searcher.user_id}> {searcher.user_id} auf ABORTED gesetzt"
+                                                f" (hat `exit` eingegeben)!")
                     else:
                         await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
+                        await self.send_to_dump(f"User <@{searcher.user_id}> {searcher.user_id} auf QUEUED gesetzt"
+                                                f" (anderer User hat `exit` eingegeben)!")
                         other_id = searcher.user_id
                 if other_id != 0 and (other_user := self.bot.get_user(other_id)) is not None:
                     await self.send_dm_text(other_user, translations.f_other_used_quitted(message.author.mention))
@@ -621,6 +767,11 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await db_thread(db.delete, db_channel)
                 try:
                     if channel:
+                        await self.chatlog(channel, translations.f_chatlog_closed_reason(
+                            donator.user_id, self.guild.get_member(donator.user_id),
+                            searcher.user_id, self.guild.get_member(searcher.user_id),
+                            f"{message.author.mention} hat exit eingegeben",
+                        ))
                         await channel.delete()
                 except Exception as e:
                     sentry_sdk.capture_exception(e)
@@ -634,6 +785,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                 if not matcher or len(matcher.groups()) == 0 or not 1 <= int(matcher.groups()[0]) <= 5:
                     await self.send_dm_text(message.author, translations.gift_invalid_input)
                     return
+                await self.send_to_dump(f"User <@{user.user_id}> {user.user_id} hat jetzt"
+                                        f" 0 verbrauchte Einladungen and wurde auf QUEUED gesetzt")
                 await db_thread(lambda:
                                 (Donator.change_state(user.user_id, State.QUEUED),
                                  Donator.change_invite_count(user.user_id, int(matcher.groups()[0])))
@@ -644,6 +797,8 @@ class Clubhouse(Cog, name="Clubhouse"):
             else:
                 if user.state == State.INITIAL:
                     if message.content.lower() == "apple":
+                        await self.send_to_dump(f"User <@{user.user_id}> {user.user_id} auf QUEUED gesetzt"
+                                                f" (hat `apple` eingegeben)!")
                         await db_thread(Searcher.change_state, user.user_id, State.QUEUED)
                         await db_thread(Searcher.change_timestamp, user.user_id, datetime.utcnow())
                         await self.send_dm_text(message.author, translations.mag_added_queue)
@@ -679,11 +834,15 @@ class Clubhouse(Cog, name="Clubhouse"):
 
         db_channel: Optional[Channel] = await db_thread(db.get, Channel, channel.id)
         if await db_thread(db.get, Searcher, db_channel.searcher_id):
+            await self.send_to_dump(f"User <@{db_channel.searcher_id}> {db_channel.searcher_id} auf DONE gesetzt"
+                                    f" (Channel geschlossen)!")
             await db_thread(Searcher.change_state, db_channel.searcher_id, State.DONE)
         donator: Optional[Donator] = await db_thread(db.get, Donator, db_channel.donator_id)
         if donator \
                 and donator.used_invites >= donator.invite_count \
                 and await db_thread(lambda: db.query(Channel).filter_by(donator_id=donator.user_id).count()) <= 1:
+            await self.send_to_dump(f"User <@{db_channel.donator_id}> {db_channel.donator_id} auf DONE gesetzt"
+                                    f" (Channel geschlossen)!")
             await db_thread(Donator.change_state, db_channel.donator_id, State.DONE)
         if db_channel:
             users_to_notify: List[discord.Member] = [
@@ -694,6 +853,11 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await self.send_dm_text(users_to_notify[0], translations.invite_user)
         try:
             await db_thread(db.delete, db_channel)
+            await self.chatlog(channel, translations.f_chatlog_closed_reason(
+                donator.user_id, self.guild.get_member(donator.user_id),
+                db_channel.searcher_id, self.guild.get_member(db_channel.searcher_id),
+                f"{user.mention} hat den Channel geschlossen (.close).",
+            ))
             await channel.delete()
         except (Forbidden, NotFound, HTTPException):
             pass
@@ -727,16 +891,25 @@ class Clubhouse(Cog, name="Clubhouse"):
         db_channel: Optional[Channel] = await db_thread(db.get, Channel, channel.id)
         if await db_thread(db.get, Searcher, member.id):
             await db_thread(Searcher.change_state, db_channel.searcher_id, State.DONE)
+            await self.send_to_dump(f"User <@{db_channel.searcher_id}> {db_channel.searcher_id} auf DONE gesetzt,"
+                                    f" (done command)!")
         else:
             await db_thread(Searcher.change_state, db_channel.searcher_id, State.QUEUED)
+            await self.send_to_dump(f"User <@{db_channel.searcher_id}> {db_channel.searcher_id} auf QUEUED gesetzt"
+                                    f" (anderer User wurde durch den done command rausgenommen)!")
         donator: Optional[Donator] = await db_thread(db.get, Donator, member.id)
-        if donator \
-                and donator.used_invites >= donator.invite_count \
-                and await db_thread(lambda: db.query(Channel).filter_by(donator_id=donator.user_id).count()) <= 1:
-            await db_thread(Donator.change_state, db_channel.donator_id, State.DONE)
+        if donator:  # keep this separate ifs!
+            if donator.used_invites >= donator.invite_count \
+                    and await db_thread(lambda: db.query(Channel).filter_by(donator_id=donator.user_id).count()) <= 1:
+                await db_thread(Donator.change_state, db_channel.donator_id, State.DONE)
+            await self.send_to_dump(f"User <@{db_channel.donator_id}> {db_channel.donator_id} auf DONE gesetzt"
+                                    f" (done command, und keine Einladungen mehr frei)!")
         else:
             donator = await db_thread(db.get, Donator, db_channel.donator_id)
             if donator:
+                await self.send_to_dump(f"User <@{donator.user_id}> {donator.user_id} hat jetzt"
+                                        f" {max(0, donator.used_invites - 1)} verbrauchte Einladungen"
+                                        f" (done command auf anderem User)!")
                 await db_thread(Donator.change_used_invites, donator.user_id, max(0, donator.used_invites - 1))
         if db_channel:
             users_to_notify: List[discord.Member] = [
@@ -747,6 +920,11 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await self.send_dm_text(user_to_notify, translations.invite_user)
         try:
             await db_thread(db.delete, db_channel)
+            await self.chatlog(channel, translations.f_chatlog_closed_reason(
+                donator.user_id, self.guild.get_member(donator.user_id),
+                db_channel.searcher_id, self.guild.get_member(db_channel.searcher_id),
+                f"{author.mention} hat {member.mention} auf den Status DONE gesetzt.",
+            ))
             await channel.delete()
         except (Forbidden, NotFound, HTTPException):
             pass
@@ -786,13 +964,17 @@ class Clubhouse(Cog, name="Clubhouse"):
                 return
 
         found = 0
-        user: Optional[Donator] = await db_thread(db.get, Donator, member.id)
-        if user:
-            await db_thread(db.delete, user)
+        donator: Optional[Donator] = await db_thread(db.get, Donator, member.id)
+        if donator:
+            await db_thread(db.delete, donator)
+            await self.send_to_dump(f"User <@{member.id}> {member.id} aus der Datenbank gelöscht, "
+                                    f" (reset)!")
             found += 1
-        user: Optional[Searcher] = await db_thread(db.get, Searcher, member.id)
-        if user:
-            await db_thread(db.delete, user)
+        searcher: Optional[Searcher] = await db_thread(db.get, Searcher, member.id)
+        if searcher:
+            await db_thread(db.delete, searcher)
+            await self.send_to_dump(f"User <@{member.id}> {member.id} aus der Datenbank gelöscht, "
+                                    f" (reset)!")
             found += 1
         if found == 0:
             await ctx.send(translations.f_user_not_found(member.mention))
@@ -800,15 +982,23 @@ class Clubhouse(Cog, name="Clubhouse"):
         else:
             await ctx.send(translations.f_user_resetted(member.mention))
             for db_channel in open_channels:
-                donator = await db_thread(db.get, Donator, db_channel.donator_id)
                 other_id = 0
-                if donator and member.id != donator.user_id:
-                    await db_thread(Donator.change_used_invites, donator.user_id, max(0, donator.used_invites - 1))
-                    other_id = donator.user_id
-                searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
-                if searcher and member.id != searcher.user_id:
-                    await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
-                    other_id = searcher.user_id
+                if not donator:
+                    donator = await db_thread(db.get, Donator, db_channel.donator_id)
+                    if donator:
+                        await db_thread(Donator.change_used_invites, donator.user_id, max(0, donator.used_invites - 1))
+                        await self.send_to_dump(
+                            f"User <@{donator.user_id}> {donator.user_id}"
+                            f" hat jetzt  {max(0, donator.used_invites - 1)}"
+                            f" Einladungen verbraucht (anderer User wurde resetted)")
+                        other_id = donator.user_id
+                if not searcher:
+                    searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
+                    if searcher and member.id != searcher.user_id:
+                        await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
+                        await self.send_to_dump(f"User <@{db_channel.searcher_id}> {db_channel.searcher_id}"
+                                                f" auf QUEUED gesetzt (anderer User wurde resetted)")
+                        other_id = searcher.user_id
                 if other_id != 0 and (other_user := self.bot.get_user(other_id)) is not None:
                     await self.send_dm_text(other_user, translations.f_channel_was_closed_by_team(member.mention))
 
@@ -876,21 +1066,6 @@ class Clubhouse(Cog, name="Clubhouse"):
         embed.add_field(name="Suchende User", value=searching_users or "Keine suchenden User", inline=True)
         embed.add_field(name="Anbietende User", value=active_donator_list or "Keine Angebote", inline=True)
         await send_long_embed(ctx, embed)
-
-    @commands.command()
-    @guild_only()
-    async def count_queue(self, ctx: Context):
-        """
-        team only
-        get length of direct message queue
-        """
-        if self.team_role not in ctx.author.roles:
-            await ctx.send(translations.f_permission_denied(ctx.author.mention))
-            return
-        if ctx.message.author.bot:
-            return
-
-        await ctx.send(f"Anzahl: {len(self.task_set)}")
 
     @commands.command(aliases=["us"])
     @guild_only()
@@ -993,9 +1168,16 @@ class Clubhouse(Cog, name="Clubhouse"):
         db_channel: Optional[Channel] = await db_thread(db.get, Channel, ctx.channel.id)
         if db_channel:
             if await db_thread(db.get, Searcher, db_channel.searcher_id):
+                await self.send_to_dump(f"User <@{db_channel.searcher_id}> {db_channel.searcher_id}"
+                                        f" wurde zurück auf QUEUED gesetzt"
+                                        f" (requeue)")
                 await db_thread(Searcher.change_state, db_channel.searcher_id, State.QUEUED)
             donator: Optional[Donator] = await db_thread(db.get, Donator, db_channel.donator_id)
             if donator:
+                await self.send_to_dump(
+                    f"User <@{donator.user_id}> {donator.user_id}"
+                    f" hat jetzt  {max(0, donator.used_invites - 1)}"
+                    f" Einladungen verbraucht (requeue)")
                 await db_thread(Donator.change_used_invites, donator.user_id, max(0, donator.used_invites - 1))
             for db_user in [db_channel.searcher_id, db_channel.donator_id]:
                 user: Optional[discord.Member] = self.guild.get_member(db_user)
@@ -1003,6 +1185,11 @@ class Clubhouse(Cog, name="Clubhouse"):
                     await self.send_dm_text(user, translations.back_to_queue)
         try:
             await db_thread(db.delete, db_channel)
+            await self.chatlog(ctx.channel, translations.f_chatlog_closed_reason(
+                donator.user_id, self.guild.get_member(donator.user_id),
+                db_channel.searcher_id, self.guild.get_member(db_channel.searcher_id),
+                f"{ctx.author.mention} hat die beiden zurück in die Warteschlange gesteckt.",
+            ))
             await ctx.channel.delete()
         except (Forbidden, NotFound, HTTPException):
             pass
@@ -1164,6 +1351,8 @@ class Clubhouse(Cog, name="Clubhouse"):
         )
         if searcher:
             await db_thread(Searcher.change_timestamp, user_id=member.id, timestamp=datetime(1970, 1, 1, 0, 0, 0))
+            await self.send_to_dump(f"Searcher <@{searcher.user_id}> {searcher.user_id}"
+                                    f" wurde an die Spitze der Warteschlange geschoben.")
             await ctx.send(f"Moved {member.mention} to the top of the queue.")
             return
 
@@ -1174,6 +1363,8 @@ class Clubhouse(Cog, name="Clubhouse"):
         )
         if donator:
             await db_thread(Donator.change_timestamp, user_id=member.id, timestamp=datetime(1970, 1, 1, 0, 0, 0))
+            await self.send_to_dump(f"Donator <@{donator.user_id}> {donator.user_id}"
+                                    f" wurde an die Spitze der Warteschlange geschoben.")
             await ctx.send(f"Moved {member.mention} to the top of the queue.")
             return
         await ctx.send(translations.f_user_not_found(member.mention))
@@ -1181,6 +1372,8 @@ class Clubhouse(Cog, name="Clubhouse"):
     @commands.command()
     @guild_only()
     async def rm(self, ctx: Context, member: Optional[Member]):
+        await ctx.send("Temporär deaktiviert")
+        return
         """
         team only
         remove a matched user and ban him from the whole process (but not from the server)
@@ -1225,16 +1418,25 @@ class Clubhouse(Cog, name="Clubhouse"):
             if donator:
                 if member.id == donator.user_id:
                     await db_thread(Donator.change_state, member.id, State.ABORTED)
+                    await self.send_to_dump(f"User <@{donator.user_id}> {donator.user_id}"
+                                            f" wurde auf ABORTED gesetzt (aus dem Prozess gebannt)")
                 else:
                     await db_thread(Donator.change_used_invites, donator.user_id,
                                     max(0, donator.used_invites - 1))
+                    await self.send_to_dump(f"User <@{donator.user_id}> {donator.user_id} hat jetzt"
+                                            f" {max(0, donator.used_invites - 1)} verbrauchte Einladungen"
+                                            f" (anderer User aus dem Prozess gebannt)!")
                     other_id = donator.user_id
 
             searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
             if searcher:
                 if member.id == searcher.user_id:
                     await db_thread(Searcher.change_state, searcher.user_id, State.ABORTED)
+                    await self.send_to_dump(f"User <@{searcher.user_id}> {searcher.user_id}"
+                                            f" wurde auf ABORTED gesetzt (aus dem Prozess gebannt)")
                 else:
+                    await self.send_to_dump(f"User <@{searcher.user_id}> {searcher.user_id}"
+                                            f" wurde zurück auf QUEUED gesetzt (anderer User aus dem Prozess gebannt)")
                     await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
                     other_id = searcher.user_id
 
@@ -1245,6 +1447,11 @@ class Clubhouse(Cog, name="Clubhouse"):
             await db_thread(db.delete, db_channel)
             try:
                 if channel:
+                    await self.chatlog(ctx.channel, translations.f_chatlog_closed_reason(
+                        donator.user_id, self.guild.get_member(donator.user_id),
+                        db_channel.searcher_id, self.guild.get_member(db_channel.searcher_id),
+                        f"{ctx.author.mention} hat {member.mention} den Status ABORTED zugewiesen.",
+                    ))
                     await channel.delete()
             except Exception as e:
                 sentry_sdk.capture_exception(e)
@@ -1272,9 +1479,19 @@ class Clubhouse(Cog, name="Clubhouse"):
         @guild_only()
         async def kick(self, ctx: Context, member: Member):
             """
-            kicks a user (well the bot thinks that)
+            kicks a user (at least the bot thinks that)
             """
             if ctx.message.author.bot:
                 return
             await self.on_member_remove(member)
             await ctx.send("Done")
+
+        @commands.command()
+        @guild_only()
+        async def log(self, ctx: Context):
+            """
+            export the channel log to a html file
+            """
+            if ctx.message.author.bot:
+                return
+            await self.chatlog(ctx.channel, "TEST")

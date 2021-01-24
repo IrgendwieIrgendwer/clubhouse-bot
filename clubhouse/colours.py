@@ -1,5 +1,4 @@
-from PyDrocsid.material_colours import MaterialColours, NestedInt
-from discord import Colour
+from PyDrocsid.material_colours import MaterialColours
 
 
 class Colours(MaterialColours):

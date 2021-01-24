@@ -1,14 +1,12 @@
 import re
-from typing import Optional, Union
+from typing import Optional
 
-from PyDrocsid.emojis import name_to_emoji
 from PyDrocsid.settings import Settings
 from PyDrocsid.translations import translations
-from discord import Member, TextChannel, Guild, Message, Embed, PartialEmoji, Forbidden
+from discord import Embed
 from discord.ext.commands import ColorConverter, BadArgument
 
 from colours import Colours
-from permissions import PermissionLevel, Permission
 
 
 class Color(ColorConverter):

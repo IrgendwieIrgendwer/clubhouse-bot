@@ -1,5 +1,4 @@
 import os
-import string
 from datetime import datetime
 from typing import Optional, Iterable
 
@@ -15,16 +14,14 @@ from discord.ext.commands import (
     Bot,
     Context,
     CommandError,
-    guild_only, CommandNotFound,
+    CommandNotFound,
 )
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from cogs.clubhouse import Clubhouse
-
 from colours import Colours
 from info import CLUBHOUSE_ICON, CONTRIBUTORS, GITHUB_LINK, VERSION, AVATAR_URL, GITHUB_DESCRIPTION
-from permissions import PermissionLevel
 from util import get_prefix
 
 banner = r"""

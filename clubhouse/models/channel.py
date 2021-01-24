@@ -14,6 +14,7 @@ class Channel(db.Base):
     # searcher = db.relationship('Channel', backref=db.backref('searcher', lazy=True))
 
     donator_id: Union[Column, int] = Column(BigInteger)
+
     # donator_id = Column('donator', Integer, ForeignKey('donator.id'), nullable=False)
     # donator = db.relationship('Channel', backref=db.backref('donator', lazy=True))
 

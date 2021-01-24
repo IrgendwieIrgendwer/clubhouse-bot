@@ -6,3 +6,4 @@ app/media/
 app/static/
 app/.coverage
 app/.db.sqlite3
+/.env

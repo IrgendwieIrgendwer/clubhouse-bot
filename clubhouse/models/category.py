@@ -1,7 +1,7 @@
 from typing import Union
 
 from PyDrocsid.database import db
-from sqlalchemy import Column, Integer, String, BigInteger, Boolean
+from sqlalchemy import Column, BigInteger
 
 
 class Category(db.Base):

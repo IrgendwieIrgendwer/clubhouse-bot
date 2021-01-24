@@ -11,5 +11,3 @@ class State(enum.Enum):
     @staticmethod
     def completed(user):
         return user.state in [State.DONE, State.ABORTED]
-
-
