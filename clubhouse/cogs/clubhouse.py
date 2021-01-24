@@ -470,12 +470,14 @@ class Clubhouse(Cog, name="Clubhouse"):
         for u in searching_users:
             if self.guild.get_member(u.user_id) is None:
                 await db_thread(db.delete, u)
+                del searching_users[i]
                 await self.send_to_dump(f"User <@{u.user_id}> ({u.user_id}) aus der Datenbank gelöscht "
                                         f"(als Discord User nicht gefunden)!")
 
         for u in donating_users:
             if self.guild.get_member(u.user_id) is None:
                 await db_thread(db.delete, u)
+                del donating_users[i]
                 await self.send_to_dump(f"User <@{u.user_id}> ({u.user_id}) aus der Datenbank gelöscht "
                                         f"(als Discord User nicht gefunden)!")
 
