@@ -1224,6 +1224,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         """
         if ctx.message.author.bot:
             return
+        await ctx.message.add_reaction(name_to_emoji["white_check_mark"])
 
         donator: Optional[Donator] = await db_thread(
             lambda: db.query(Donator)
