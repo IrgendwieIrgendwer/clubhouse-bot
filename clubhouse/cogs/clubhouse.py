@@ -272,7 +272,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     except Exception as e:
                         sentry_sdk.capture_exception(e)
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(minutes=30)
     async def inactive_channel_deleter_loop(self):
         # if last message (ignore bot messages) was longer than 8 hours ago
         change = False
@@ -287,15 +287,15 @@ class Clubhouse(Cog, name="Clubhouse"):
                 if channel.type != ChannelType.text:
                     continue
                 channel: TextChannel = channel
-                if datetime.utcnow() < channel.created_at + timedelta(seconds=24):
+                if datetime.utcnow() < channel.created_at + timedelta(hours=24):
                     continue
-                async for f in channel.history(oldest_first=False, after=datetime.utcnow() - timedelta(seconds=24),
+                async for f in channel.history(oldest_first=False, after=datetime.utcnow() - timedelta(hours=24),
                                                limit=100):
                     if not f.author.bot:
                         break
                 else:
                     f = None
-                if f is None or datetime.utcnow() >= snowflake_time(f.id) + timedelta(seconds=24):
+                if f is None or datetime.utcnow() >= snowflake_time(f.id) + timedelta(hours=24):
                     db_channel: Optional[Channel] = await db_thread(db.get, Channel, channel.id)
                     if db_channel:
                         searcher: Optional[Searcher] = await db_thread(db.get, Searcher, db_channel.searcher_id)
