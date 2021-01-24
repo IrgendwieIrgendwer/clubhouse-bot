@@ -103,6 +103,23 @@ class Clubhouse(Cog, name="Clubhouse"):
         y = re.sub(r'<@\\!?(\d*?)>', lambda x: r"<@\1> ({})".format(get_member(x.group())), s)
         return y
 
+        self.jinja_env = Environment(
+            loader=FileSystemLoader(f'{Path(__file__).resolve().parent.parent}/templates')
+        )
+        self.jinja_env.filters['regexr'] = regex_replace
+        self.template = self.jinja_env.get_template('chatlog.html')
+
+    def add_mention_suffix(self, s):
+        def get_member(_id):
+            member = self.guild.get_member(int(_id))
+            if member:
+                return member.name
+            return "unknown"
+
+        # lambda x: r"<@\1> ({})".format(get_member(x.group()))
+        y = re.sub(r'<@\\!?(\d*?)>', lambda x: r"<@\1> ({})".format(get_member(x.group())), s)
+        return y
+
     async def on_ready(self):
         self.guild: Optional[Guild] = self.bot.guilds[0]
         self.team_channel = self.guild.get_channel(team_channel_id)
