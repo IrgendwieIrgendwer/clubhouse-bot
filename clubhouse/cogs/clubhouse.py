@@ -103,23 +103,6 @@ class Clubhouse(Cog, name="Clubhouse"):
         y = re.sub(r'<@\\!?(\d*?)>', lambda x: r"<@\1> ({})".format(get_member(x.group())), s)
         return y
 
-        self.jinja_env = Environment(
-            loader=FileSystemLoader(f'{Path(__file__).resolve().parent.parent}/templates')
-        )
-        self.jinja_env.filters['regexr'] = regex_replace
-        self.template = self.jinja_env.get_template('chatlog.html')
-
-    def add_mention_suffix(self, s):
-        def get_member(_id):
-            member = self.guild.get_member(int(_id))
-            if member:
-                return member.name
-            return "unknown"
-
-        # lambda x: r"<@\1> ({})".format(get_member(x.group()))
-        y = re.sub(r'<@\\!?(\d*?)>', lambda x: r"<@\1> ({})".format(get_member(x.group())), s)
-        return y
-
     async def on_ready(self):
         self.guild: Optional[Guild] = self.bot.guilds[0]
         self.team_channel = self.guild.get_channel(team_channel_id)
@@ -194,8 +177,6 @@ class Clubhouse(Cog, name="Clubhouse"):
         await self.bot_dump_channel.send(text)
 
     async def chatlog(self, channel: TextChannel, reason: str):
-        return
-
         def get_reaction_url(reaction: Reaction) -> str:
             if isinstance(reaction.emoji, str):
                 return f"https://twemoji.maxcdn.com/2/72x72/{hex(ord(str(reaction.emoji)))[2:]}.png"
@@ -457,7 +438,7 @@ class Clubhouse(Cog, name="Clubhouse"):
             await asyncio.sleep(5)
 
     async def calculate_queues(self) -> Tuple[List[Searcher], List[Donator]]:
-        def sort_users(x: Union[Donator, Searcher, None] = None, y: Union[Donator, Searcher, None] = None) -> int:
+        async def sort_users(x: Union[Donator, Searcher, None] = None, y: Union[Donator, Searcher, None] = None) -> int:
             if x is None:
                 return 1
             if y is None:
@@ -571,8 +552,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                         del donating_users[0]
                     await db_thread(db_donator.change_used_invites, db_donator.user_id, db_donator.used_invites + 1)
                     await self.send_to_dump(
-                        f"Donator <@{donator.user_id}> {donator.user_id}"
-                        f" hat jetzt  {max(0, donator.used_invites - 1)}"
+                        f"Donator <@{donator.id}> {donator.id}"
+                        f" hat jetzt  {max(0, db_donator.used_invites - 1)}"
                         f" Einladungen verbraucht. (Vermittelt)")
                     db_donator.used_invites += 1
                     await db_thread(Donator.change_state, donator.id, State.MATCHED)
