@@ -86,6 +86,23 @@ class Clubhouse(Cog, name="Clubhouse"):
         self.task_set: set = set()
         self.start_message: Optional[Message] = None
 
+        self.jinja_env = Environment(
+            loader=FileSystemLoader(f'{Path(__file__).resolve().parent.parent}/templates')
+        )
+        self.jinja_env.filters['regexr'] = regex_replace
+        self.template = self.jinja_env.get_template('chatlog.html')
+
+    def add_mention_suffix(self, s):
+        def get_member(_id):
+            member = self.guild.get_member(int(_id))
+            if member:
+                return member.name
+            return "unknown"
+
+        # lambda x: r"<@\1> ({})".format(get_member(x.group()))
+        y = re.sub(r'<@\\!?(\d*?)>', lambda x: r"<@\1> ({})".format(get_member(x.group())), s)
+        return y
+
     async def on_ready(self):
         self.guild: Optional[Guild] = self.bot.guilds[0]
         self.team_channel = self.guild.get_channel(team_channel_id)
@@ -520,7 +537,7 @@ class Clubhouse(Cog, name="Clubhouse"):
 
                     await db_thread(Channel.create, channel_id=new_channel.id, donator_id=donator.id,
                                     searcher_id=user.id)
-                    await new_channel.send(translations.f_ping_users(donator.mention, user.mention))
+                    await new_channel.send(translations.f_ping_users(user.mention, donator.mention))
                     tutorial_embed = Embed(
                         title=translations.tutorial_embed_title,
                         description=translations.f_tutorial_embed_description(
@@ -528,7 +545,8 @@ class Clubhouse(Cog, name="Clubhouse"):
                     )
                     await new_channel.send(embed=tutorial_embed)
 
-                    await self.team_channel.send(translations.f_paired_users(donator.mention, user.mention, new_channel.mention))
+                    await self.team_channel.send(
+                        translations.f_paired_users(donator.mention, user.mention, new_channel.mention))
                     await self.send_dm_text(user, translations.f_channel_created(donator.mention, new_channel.mention))
                     await self.send_dm_text(donator, translations.f_channel_created(user.mention, new_channel.mention))
 
@@ -931,7 +949,7 @@ class Clubhouse(Cog, name="Clubhouse"):
 
     @commands.command(aliases=["r"])
     @guild_only()
-    async def reset(self, ctx: Context, member: Optional[Member], force: Optional[bool]=False):
+    async def reset(self, ctx: Context, member: Optional[Member], force: Optional[bool] = False):
         """
         team only
         resets the database for a user (e.g. clicked on wrong reaction, or was banned from the process)
@@ -1006,6 +1024,11 @@ class Clubhouse(Cog, name="Clubhouse"):
                 await db_thread(db.delete, db_channel)
                 try:
                     if channel:
+                        await self.chatlog(channel, translations.f_chatlog_closed_reason(
+                            donator.user_id, self.guild.get_member(donator.user_id),
+                            searcher.user_id, self.guild.get_member(searcher.user_id),
+                            f"{ctx.author.mention} hat {member.mention} zurückgesetzt.",
+                        ))
                         await channel.delete()
                 except Exception as e:
                     sentry_sdk.capture_exception(e)

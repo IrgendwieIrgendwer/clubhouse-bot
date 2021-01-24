@@ -25,15 +25,14 @@ from info import CLUBHOUSE_ICON, CONTRIBUTORS, GITHUB_LINK, VERSION, AVATAR_URL,
 from util import get_prefix
 
 banner = r"""
-  ____ _       _     _                          
- / ___| |_   _| |__ | |__   ___  _   _ ___  ___ 
-| |   | | | | | '_ \| '_ \ / _ \| | | / __|/ _ \
-| |___| | |_| | |_) | | | | (_) | |_| \__ \  __/
- \____|_|\__,_|_.__/|_| |_|\___/ \__,_|___/\___|
- 
+  ____ ___ __  __ 
+ / ___|_ _|  \/  |
+| |    | || |\/| |
+| |___ | || |  | |
+ \____|___|_|  |_|           
 """.splitlines()
 print("\n".join(f"\033[1m\033[36m{line}\033[0m" for line in banner))
-print(f"Starting Clubhouse v{VERSION} ({GITHUB_LINK})\n")
+print(f"Starting Clubhouse Invite Management (CIM) v{VERSION} ({GITHUB_LINK})\n")
 
 sentry_dsn = os.environ.get("SENTRY_DSN")
 if sentry_dsn:
