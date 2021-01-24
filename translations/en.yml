@@ -74,8 +74,12 @@ gift_ready: "Ich werde dich schnellstmöglich mit einem Suchenden im Verbindung 
 #mag
 mag_field_name: "Nach Clubhouse Invites fragen"
 mag_field_value: "
-  Hallo {}, ich werde dich schnellstmöglich in einen Channel einladen, in dem du mit dem Einladenden schreiben kannst. Bitte habe etwas Geduld.\n\n
-  Bitte lese und befolge unbedingt untenstehende Hinweise, sonst kann dein Ticket nicht bearbeitet werden!\n\n
+  Hallo {},
+  bevor du in der Warteschlange aufgenommen wirst, musst du erstmal dein Gerät verifizieren.\n
+  Wenn du ein Android Handy benutzt, musst du die Suche leider abbrechen, da die App nur für das IPhone verfügbar ist.\n
+  Das machst du mit `exit`. Wenn du ein Iphone besitzt, musst du das mit `apple` bestätigen.\n
+  Schreibe das einfach **hier** in den Chat. Bitte lese dir die nachfolgenden Hinweise genau durch. Während der Suche hast du genug Zeit dafür.\n\n
+
   **Wichtige Hinweise**\n
   Du hast dich soeben erfolgreich als Suchender gemeldet. Sofern wir einen Einladenden haben, der einen Invite teilen möchte, werden wir ihn mit dir zusammenführen.\n
 
@@ -93,9 +97,6 @@ mag_field2_value: "
   Damit du eingeladen werden kannst, benötigst du als erstes natürlich die App. Diese findest du im App-Store unter https://apps.apple.com/de/app/clubhouse-drop-in-audio-chat/id1503133294
   "
 mag_field3_value: "
-  Wenn du sie noch nicht installiert hast, dann hole dies bitte nach. Anschließend schreibe bitte `apple` in den Chat.\n\n
-  **WICHTIG**: Die App ist zur Zeit NUR für IOS verfügbar!\n
-
   Bevor wir dich mit einem Einladenden zusammenführen, möchten wir noch einmal sicherstellen, dass du danach auch deine eigenen Einladungen mit unserer Community teilst.\n
 
   Sobald du in der App bist, kehrst du bitte auf diesen Server zurück und klickst im Kanal #lies-mich auf das Geschenk. Es erstellt sich dann ein weiteres Ticket, in welchem du Instruktionen erhälst, wie du mit anderen Suchenden zusammengeführt wirst, nur so kann unser System funktionieren..\n

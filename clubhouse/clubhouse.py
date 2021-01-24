@@ -29,7 +29,7 @@ banner = r"""
  / ___|_ _|  \/  |
 | |    | || |\/| |
 | |___ | || |  | |
- \____|___|_|  |_|           
+ \____|___|_|  |_|
 """.splitlines()
 print("\n".join(f"\033[1m\033[36m{line}\033[0m" for line in banner))
 print(f"Starting Clubhouse Invite Management (CIM) v{VERSION} ({GITHUB_LINK})\n")
