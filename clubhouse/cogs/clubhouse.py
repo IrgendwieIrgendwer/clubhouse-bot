@@ -131,17 +131,17 @@ class Clubhouse(Cog, name="Clubhouse"):
                 #        await channel.set_permissions(self.guild.me, overwrite=needed_permissions)
                 if category.id not in db_categories:
                     await db_thread(Category.create, category_id=category.id)
-                    await self.send_to_dump(f"Category <#{category.id}> {category.id} added to database")
+                    await self.send_to_dump(f"Category <#{category.id}> ({category.id}) added to database")
                 found_categories.append(category.id)
         for category_id in set(db_categories.keys()).difference(set(found_categories)):
             await db_thread(db.delete, db_categories.get(category_id))
-            await self.send_to_dump(f"Kategorie <#{category_id}> {category_id} aus der Datenbank gelöscht")
+            await self.send_to_dump(f"Kategorie <#{category_id}> ({category_id}) aus der Datenbank gelöscht")
             del db_categories[category_id]
 
         try:
             if found_categories == 0:
                 category: CategoryChannel = await self.guild.create_category("Vermittlung")
-                await self.send_to_dump(f"Category <#{category.id}> {category.id} created and added to database")
+                await self.send_to_dump(f"Category <#{category.id}> ({category.id}) created and added to database")
                 await db_thread(Category.create, category.id)
         except Exception as e:
             sentry_sdk.capture_exception(e)
@@ -1008,7 +1008,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     if donator:
                         await db_thread(Donator.change_used_invites, donator.user_id, max(0, donator.used_invites - 1))
                         await self.send_to_dump(
-                            f"User <@{donator.user_id}> {donator.user_id}"
+                            f"User <@{donator.user_id}> ({donator.user_id})"
                             f" hat jetzt  {max(0, donator.used_invites - 1)}"
                             f" Einladungen verbraucht (anderer User wurde resetted)")
                         other_id = donator.user_id
@@ -1016,7 +1016,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                     searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
                     if searcher and member.id != searcher.user_id:
                         await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
-                        await self.send_to_dump(f"User <@{db_channel.searcher_id}> {db_channel.searcher_id}"
+                        await self.send_to_dump(f"User <@{db_channel.searcher_id}> ({db_channel.searcher_id})"
                                                 f" auf QUEUED gesetzt (anderer User wurde resetted)")
                         other_id = searcher.user_id
                 if other_id != 0 and (other_user := self.bot.get_user(other_id)) is not None:
@@ -1193,14 +1193,14 @@ class Clubhouse(Cog, name="Clubhouse"):
         db_channel: Optional[Channel] = await db_thread(db.get, Channel, ctx.channel.id)
         if db_channel:
             if await db_thread(db.get, Searcher, db_channel.searcher_id):
-                await self.send_to_dump(f"User <@{db_channel.searcher_id}> {db_channel.searcher_id}"
+                await self.send_to_dump(f"User <@{db_channel.searcher_id}> ({db_channel.searcher_id})"
                                         f" wurde zurück auf QUEUED gesetzt"
                                         f" (requeue)")
                 await db_thread(Searcher.change_state, db_channel.searcher_id, State.QUEUED)
             donator: Optional[Donator] = await db_thread(db.get, Donator, db_channel.donator_id)
             if donator:
                 await self.send_to_dump(
-                    f"User <@{donator.user_id}> {donator.user_id}"
+                    f"User <@{donator.user_id}> ({donator.user_id})"
                     f" hat jetzt  {max(0, donator.used_invites - 1)}"
                     f" Einladungen verbraucht (requeue)")
                 await db_thread(Donator.change_used_invites, donator.user_id, max(0, donator.used_invites - 1))
@@ -1376,7 +1376,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         )
         if searcher:
             await db_thread(Searcher.change_timestamp, user_id=member.id, timestamp=datetime(1970, 1, 1, 0, 0, 0))
-            await self.send_to_dump(f"Searcher <@{searcher.user_id}> {searcher.user_id}"
+            await self.send_to_dump(f"Searcher <@{searcher.user_id}> ({searcher.user_id})"
                                     f" wurde an die Spitze der Warteschlange geschoben.")
             await ctx.send(f"Moved {member.mention} to the top of the queue.")
             return
@@ -1388,7 +1388,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         )
         if donator:
             await db_thread(Donator.change_timestamp, user_id=member.id, timestamp=datetime(1970, 1, 1, 0, 0, 0))
-            await self.send_to_dump(f"Donator <@{donator.user_id}> {donator.user_id}"
+            await self.send_to_dump(f"Donator <@{donator.user_id}> ({donator.user_id})"
                                     f" wurde an die Spitze der Warteschlange geschoben.")
             await ctx.send(f"Moved {member.mention} to the top of the queue.")
             return
@@ -1443,12 +1443,12 @@ class Clubhouse(Cog, name="Clubhouse"):
             if donator:
                 if member.id == donator.user_id:
                     await db_thread(Donator.change_state, member.id, State.ABORTED)
-                    await self.send_to_dump(f"User <@{donator.user_id}> {donator.user_id}"
+                    await self.send_to_dump(f"User <@{donator.user_id}> ({donator.user_id})"
                                             f" wurde auf ABORTED gesetzt (aus dem Prozess gebannt)")
                 else:
                     await db_thread(Donator.change_used_invites, donator.user_id,
                                     max(0, donator.used_invites - 1))
-                    await self.send_to_dump(f"User <@{donator.user_id}> {donator.user_id} hat jetzt"
+                    await self.send_to_dump(f"User <@{donator.user_id}> ({donator.user_id}) hat jetzt"
                                             f" {max(0, donator.used_invites - 1)} verbrauchte Einladungen"
                                             f" (anderer User aus dem Prozess gebannt)!")
                     other_id = donator.user_id
@@ -1457,10 +1457,10 @@ class Clubhouse(Cog, name="Clubhouse"):
             if searcher:
                 if member.id == searcher.user_id:
                     await db_thread(Searcher.change_state, searcher.user_id, State.ABORTED)
-                    await self.send_to_dump(f"User <@{searcher.user_id}> {searcher.user_id}"
+                    await self.send_to_dump(f"User <@{searcher.user_id}> ({searcher.user_id})"
                                             f" wurde auf ABORTED gesetzt (aus dem Prozess gebannt)")
                 else:
-                    await self.send_to_dump(f"User <@{searcher.user_id}> {searcher.user_id}"
+                    await self.send_to_dump(f"User <@{searcher.user_id}> ({searcher.user_id})"
                                             f" wurde zurück auf QUEUED gesetzt (anderer User aus dem Prozess gebannt)")
                     await db_thread(Searcher.change_state, searcher.user_id, State.QUEUED)
                     other_id = searcher.user_id
