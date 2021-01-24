@@ -154,7 +154,7 @@
     .chatlog__message-group {
         display: flex;
         margin: 0 10px;
-        padding: 15px 0;
+        padding: 15px 0 0;
         border-top: 1px solid
     }
 
@@ -505,7 +505,7 @@
                     <span class=chatlog__timestamp>{{ msg['timestamp'] }}</span>
                     <div class=chatlog__message id=message-{{ msg['id'] }} data-message-id={{ msg['id'] }}>
                     <div class=chatlog__content>
-                        <span class=markdown>{{ msg['content']|regexr|markdown }} </span>
+                        <p><span>{{ msg['content']|regexr|markdown }}</span></p>
                         <span></span>
                     </div>
                 {% endif %}
@@ -516,15 +516,15 @@
                             <div class=chatlog__embed-content>
                                 <div class=chatlog__embed-text>
                                     <div class=chatlog__embed-title><span class=markdown>{{ e['title']|markdown }}</span></div>
-                                    <div class=chatlog__embed-description><span
-                                            class=markdown>{{ e['description']|regexr|markdown }}</span></div>
+                                    <div class=chatlog__embed-description><p><span
+                                            class=markdown>{{ e['description']|regexr|markdown }}</span></p></div>
                                     {% if e['fields'] %}
                                         <div class=chatlog__embed-fields>
                                             {% for f in e['fields'] %}
                                                 <div class=chatlog__embed-field-name><span
                                                         class=markdown>{{ f['title']|markdown }} </span></div><br>
-                                                <div class=chatlog__embed-field-value><span
-                                                        class=markdown>{{ f['description']|regexr|markdown }}</span></div>
+                                                <div class=chatlog__embed-field-value><p><span
+                                                        class=markdown>{{ f['description']|regexr|markdown }}</span></p></div>
                                             {% endfor %}
                                         </div>
                                     {% endif %}

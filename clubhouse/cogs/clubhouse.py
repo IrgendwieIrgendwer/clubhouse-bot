@@ -101,8 +101,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                 return member.name
             return "unknown"
         if isinstance(s, str):
-        # lambda x: r"<@\1> ({})".format(get_member(x.group()))
-            y = re.sub(r'<@\\!?(\d*?)>', lambda x: r"<@\1> ({})".format(get_member(x.group())), s)
+            y = re.sub(r'<@\!?(\d*?)>', lambda x: f"<@{x.group(1)}> ({get_member(x.group(1))})", s)
         else:
             y = ""
         return y
@@ -182,7 +181,8 @@ class Clubhouse(Cog, name="Clubhouse"):
 
     async def chatlog(self, channel: TextChannel, reason: str):
         def get_reaction_url(reaction: Reaction) -> str:
-            if isinstance(reaction.emoji, str):
+            # TODO check if length can be longer than 1
+            if isinstance(reaction.emoji, str) and len(reaction.emoji) == 1:
                 return f"https://twemoji.maxcdn.com/2/72x72/{hex(ord(str(reaction.emoji)))[2:]}.png"
             else:
                 return reaction.emoji.url
