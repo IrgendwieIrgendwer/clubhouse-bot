@@ -1093,11 +1093,11 @@ class Clubhouse(Cog, name="Clubhouse"):
 
     @commands.command(aliases=["us"])
     @guild_only()
-    async def unshared_users(self, ctx: Context, ignore_coupled: Optional[bool] = False):
+    async def unshared_users(self, ctx: Context, ignore_coupled: Optional[bool] = True):
         """
         team only
         get users, which have not shared their invites
-        ignore_coupled: if all coupled should be mentioned as well
+        ignore_coupled: if all coupled should be ignored as well, default True
         """
         if ctx.message.author.bot:
             return
