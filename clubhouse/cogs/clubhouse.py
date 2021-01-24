@@ -497,10 +497,15 @@ class Clubhouse(Cog, name="Clubhouse"):
                     db_donator = donating_users[0]
                     donator: Optional[discord.Member] = self.guild.get_member(db_donator.user_id)
                     if not donator:
-                        del donating_users[0]
-                        await db_thread(db.delete, db_donator)
-                        await self.send_to_dump(f"Donator <@{db_donator.user_id}> ({db_donator.user_id})"
+                        if db_donator.state == State.MATCHED:
+                            await db_thread(Searcher.change_state, db_donator.user_id, State.ABORTED)
+                            await self.send_to_dump(f"Donator <@{db_donator.user_id}> ({db_donator.user_id})"
+                                                    f" auf ABORTED gesetzt (als Discord User nicht gefunden)")
+                        else:
+                            await db_thread(db.delete, db_donator)
+                            await self.send_to_dump(f"Donator <@{db_donator.user_id}> ({db_donator.user_id})"
                                                 f" aus der Datenbank gelöscht (als Discord User nicht gefunden)!")
+                        del donating_users[0]
                         continue
 
                     overwrites = {
