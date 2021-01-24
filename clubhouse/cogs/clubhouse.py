@@ -597,7 +597,7 @@ class Clubhouse(Cog, name="Clubhouse"):
                         other_id = donator.user_id
                     await db_thread(Donator.change_used_invites, donator.user_id,
                                     max(0, donator.used_invites - 1))
-                    await self.send_to_dump(f"Donator <@{donator.id}> ({donator.id}) hat nun"
+                    await self.send_to_dump(f"Donator <@{donator.user_id}> ({donator.user_id}) hat nun"
                                             f" {max(0, donator.used_invites - 1)} verbrauchte Einladungen"
                                             f" (anderer User hat den Server verlassen)")
                 searcher = await db_thread(db.get, Searcher, db_channel.searcher_id)
