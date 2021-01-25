@@ -483,11 +483,11 @@ class Clubhouse(Cog, name="Clubhouse"):
             if not searching_users:
                 return
 
-            for db_user in searching_users:
-                user: Optional[discord.Member] = self.guild.get_member(db_user.user_id)
+            for db_searcher in searching_users:
+                user: Optional[discord.Member] = self.guild.get_member(db_searcher.user_id)
                 if not user:
-                    await db_thread(db.delete, db_user)
-                    await self.send_to_dump(f"Searcher <@{db_user.user_id}> ({db_user.user_id})"
+                    await db_thread(db.delete, db_searcher)
+                    await self.send_to_dump(f"Searcher <@{db_searcher.user_id}> ({db_searcher.user_id})"
                                             f" aus der Datenbank gelöscht (als Discord User nicht gefunden)!")
                     continue
                 while len(donating_users) > 0:
@@ -554,10 +554,12 @@ class Clubhouse(Cog, name="Clubhouse"):
                         f" hat jetzt  {max(0, db_donator.used_invites - 1)}"
                         f" Einladungen verbraucht. (Vermittelt)")
                     db_donator.used_invites += 1
-                    await db_thread(Donator.change_state, donator.id, State.MATCHED)
-                    await self.send_to_dump(f"Donator <@{donator.id}> ({donator.id}) auf MATCHED gesetzt")
-                    await db_thread(Searcher.change_state, user.id, State.MATCHED)
-                    await self.send_to_dump(f"Searcher <@{user.id}> ({user.id}) auf MATCHED gesetzt")
+                    if db_donator.state != State.MATCHED:
+                        await db_thread(Donator.change_state, donator.id, State.MATCHED)
+                        await self.send_to_dump(f"Donator <@{donator.id}> ({donator.id}) auf MATCHED gesetzt")
+                    if db_searcher.state != State.MATCHED:
+                        await db_thread(Searcher.change_state, user.id, State.MATCHED)
+                        await self.send_to_dump(f"Searcher <@{user.id}> ({user.id}) auf MATCHED gesetzt")
                     break
 
     async def on_member_remove(self, member: Member):
@@ -864,8 +866,9 @@ class Clubhouse(Cog, name="Clubhouse"):
                 u for u, o in channel.overwrites.items()
                 if isinstance(u, discord.Member) and u.id == db_channel.searcher_id
             ]
-            if not await db_thread(db.get, Donator, users_to_notify[0].id):
-                await self.send_dm_text(users_to_notify[0], translations.invite_user)
+            if len(users_to_notify) > 0:
+                if not await db_thread(db.get, Donator, users_to_notify[0].id):
+                    await self.send_dm_text(users_to_notify[0], translations.invite_user)
         try:
             await db_thread(db.delete, db_channel)
             await self.chatlog(channel, translations.f_chatlog_closed_reason(
@@ -1209,7 +1212,7 @@ class Clubhouse(Cog, name="Clubhouse"):
         try:
             await db_thread(db.delete, db_channel)
             await self.chatlog(ctx.channel, translations.f_chatlog_closed_reason(
-                donator.user_id, self.guild.get_member(donator.user_id),
+                db_channel.donator_id, self.guild.get_member(db_channel.donator_id),
                 db_channel.searcher_id, self.guild.get_member(db_channel.searcher_id),
                 f"{ctx.author.mention} hat die beiden zurück in die Warteschlange gesteckt.",
             ))
